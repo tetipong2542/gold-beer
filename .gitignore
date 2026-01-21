@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build output
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.bak
+
+# Logs
+*.log
+npm-debug.log*
+pip-log.txt
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.local.json
+
+# Test coverage
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Data files (keep structure, ignore data)
+gold_price_history.json
+gold_settings.json
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets (never commit)
+credentials.json
+secrets.json
+*.pem
+*.key
+
+# WordPress Plugin (separate distribution)
+wordpress-plugin/

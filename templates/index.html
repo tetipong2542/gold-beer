@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ราคาทองคำวันนี้ - Gold Price API</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --gold: #FFD700;
+            --gold-dark: #B8860B;
+            --gold-light: #FFF8DC;
+            --green: #22c55e;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --purple: #8b5cf6;
+            --dark: #1a1a2e;
+            --darker: #16162a;
+            --card-bg: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--darker) 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #888;
+            font-size: 1.1rem;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 50px;
+            color: var(--gold);
+            font-size: 0.9rem;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .countdown-badge {
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--purple);
+        }
+
+        .countdown-value {
+            font-weight: 700;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(1.2);
+            }
+        }
+
+        .price-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .price-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 24px;
+            border: 1px solid rgba(255, 215, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .price-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(255, 215, 0, 0.1);
+        }
+
+        .price-card h3 {
+            color: var(--gold);
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .price-row:last-child {
+            border-bottom: none;
+        }
+
+        .price-label {
+            color: #888;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .price-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .buy {
+            color: var(--green);
+        }
+
+        .sell {
+            color: var(--gold);
+        }
+
+        .price-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .price-change.up {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--green);
+        }
+
+        .price-change.down {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--red);
+        }
+
+        .price-change.unchanged {
+            background: rgba(255, 255, 255, 0.1);
+            color: #888;
+        }
+
+        /* Today's Change Summary */
+        .today-change {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .change-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .change-item.positive {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--green);
+        }
+
+        .change-item.negative {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--red);
+        }
+
+        .admin-settings {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 24px;
+            border: 1px solid rgba(255, 215, 0, 0.1);
+            margin-bottom: 40px;
+        }
+
+        .admin-settings h2 {
+            color: var(--gold);
+            margin-bottom: 24px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-section {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .toggle-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .toggle-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .toggle-title .badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--purple);
+            color: #fff;
+        }
+
+        .toggle-desc {
+            color: #888;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 56px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4a4a5a;
+            transition: 0.3s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(28px);
+        }
+
+        .toggle-content {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .toggle-content.hidden {
+            display: none;
+        }
+
+        .settings-form {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group label {
+            color: #ccc;
+            font-size: 0.95rem;
+        }
+
+        .form-group input {
+            width: 80px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.2);
+        }
+
+        .save-btn {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .save-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(255, 215, 0, 0.2);
+        }
+
+        .settings-info {
+            width: 100%;
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 3px solid var(--blue);
+            border-radius: 8px;
+            color: #a0c4ff;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .settings-info i {
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .settings-warning {
+            background: rgba(239, 68, 68, 0.1);
+            border-left-color: var(--red);
+            color: #fca5a5;
+        }
+
+        .settings-success {
+            background: rgba(34, 197, 94, 0.1);
+            border-left-color: var(--green);
+            color: #86efac;
+        }
+
+        .current-interval {
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        .adaptive-status {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .status-item {
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+
+        .status-item span {
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        .api-docs {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 215, 0, 0.1);
+            margin-bottom: 40px;
+        }
+
+        .api-docs h2 {
+            color: var(--gold);
+            margin-bottom: 24px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .api-endpoint {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border-left: 3px solid var(--gold);
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .method {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .method.get {
+            background: var(--green);
+            color: #fff;
+        }
+
+        .method.post {
+            background: var(--blue);
+            color: #fff;
+        }
+
+        .endpoint-url {
+            font-family: monospace;
+            color: var(--gold);
+            font-size: 1rem;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        .endpoint-url:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+
+        .endpoint-desc {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .code-example {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+
+        .code-example h4 {
+            color: var(--gold);
+            margin-bottom: 12px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .code-example pre {
+            color: #e0e0e0;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .footer a {
+            color: var(--gold);
+            text-decoration: none;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .price-value {
+                font-size: 1.2rem;
+            }
+
+            .settings-form {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .status-row {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-top: 15px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+        }
+
+        .refresh-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 14px 24px;
+            border-radius: 12px;
+            background: var(--green);
+            color: #fff;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.error {
+            background: var(--red);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-title">
+                <i data-lucide="crown" style="width: 40px; height: 40px; color: var(--gold);"></i>
+                <h1>ราคาทองคำวันนี้</h1>
+            </div>
+            <p>ข้อมูลจากสมาคมค้าทองคำ อัพเดทอัตโนมัติ</p>
+
+            <div class="status-row">
+                <div class="status-badge">
+                    <span class="pulse"></span>
+                    <span id="lastUpdate">กำลังโหลด...</span>
+                </div>
+                <div class="status-badge countdown-badge">
+                    <i data-lucide="timer" style="width: 16px; height: 16px;"></i>
+                    รีเฟรชใน <span class="countdown-value" id="countdown">--</span> วินาที
+                </div>
+            </div>
+
+            <button class="refresh-btn" onclick="refreshPrices()">
+                <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i>
+                Refresh
+            </button>
+        </header>
+
+        <div class="price-grid">
+            <div class="price-card">
+                <h3><i data-lucide="coins" style="width: 24px; height: 24px;"></i> ทองคำแท่ง 96.5%</h3>
+                <div class="price-row">
+                    <span class="price-label"><i data-lucide="download" style="width: 16px; height: 16px;"></i>
+                        รับซื้อ</span>
+                    <span class="price-value buy" id="barBuy">-</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label"><i data-lucide="tag" style="width: 16px; height: 16px;"></i> ขายออก</span>
+                    <span class="price-value sell" id="barSell">-</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label"><i data-lucide="activity" style="width: 16px; height: 16px;"></i>
+                        เปลี่ยนแปลงล่าสุด</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="price-change unchanged" id="priceChange">-</span>
+                        <span style="color: #888; font-size: 0.9rem;" id="changeCount">-</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <span class="price-label"><i data-lucide="calendar" style="width: 16px; height: 16px;"></i>
+                        รวมวันนี้</span>
+                    <div class="today-change" id="todayChange">-</div>
+                </div>
+            </div>
+
+            <div class="price-card">
+                <h3><i data-lucide="gem" style="width: 24px; height: 24px;"></i> ทองรูปพรรณ 96.5%</h3>
+                <div class="price-row">
+                    <span class="price-label"><i data-lucide="download" style="width: 16px; height: 16px;"></i>
+                        รับซื้อ</span>
+                    <span class="price-value buy" id="ornamentBuy">-</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label"><i data-lucide="tag" style="width: 16px; height: 16px;"></i> ขายออก</span>
+                    <span class="price-value sell" id="ornamentSell">-</span>
+                </div>
+
+            </div>
+        </div>
+
+        <section class="admin-settings">
+            <h2><i data-lucide="settings" style="width: 24px; height: 24px;"></i> ตั้งค่าการรีเฟรช</h2>
+
+            <div class="toggle-section">
+                <div class="toggle-header">
+                    <div class="toggle-title">
+                        <i data-lucide="clock" style="width: 20px; height: 20px; color: var(--blue);"></i>
+                        ตั้งค่า Interval ด้วยตนเอง
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="manualToggle" checked onchange="toggleManualMode()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <p class="toggle-desc">กำหนดความถี่ในการดึงราคาด้วยตนเอง (60-500 วินาที)</p>
+
+                <div class="toggle-content" id="manualContent">
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label>รีเฟรชทุก</label>
+                            <input type="number" id="refreshInterval" min="60" max="500" value="120">
+                            <label>วินาที</label>
+                        </div>
+                        <button class="save-btn" onclick="saveManualSettings()">
+                            <i data-lucide="save" style="width: 16px; height: 16px;"></i>
+                            บันทึก
+                        </button>
+                        <span class="current-interval">ปัจจุบัน: <span id="currentInterval">120</span> วินาที</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toggle-section">
+                <div class="toggle-header">
+                    <div class="toggle-title">
+                        <i data-lucide="brain" style="width: 20px; height: 20px; color: var(--purple);"></i>
+                        Adaptive Refresh Rate
+                        <span class="badge">แนะนำ</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="adaptiveToggle" onchange="toggleAdaptiveMode()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <p class="toggle-desc">
+                    ปรับความถี่อัตโนมัติตามช่วงเวลาและความเคลื่อนไหวของราคา
+                </p>
+
+                <div class="toggle-content hidden" id="adaptiveContent">
+                    <div class="adaptive-status">
+                        <div class="status-item">
+                            <i data-lucide="timer" style="width: 14px; height: 14px;"></i>
+                            Interval ปัจจุบัน: <span id="adaptiveInterval">60</span>s
+                        </div>
+                        <div class="status-item">
+                            <i data-lucide="repeat" style="width: 14px; height: 14px;"></i>
+                            ราคาไม่เปลี่ยน: <span id="unchangedCount">0</span> ครั้ง
+                        </div>
+                    </div>
+
+                    <div class="settings-info settings-success">
+                        <i data-lucide="shield-check" style="width: 18px; height: 18px;"></i>
+                        <div><strong>ข้อดี:</strong> ลดโอกาสถูกบล็อก IP และประหยัด resources</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-info settings-warning">
+                <i data-lucide="alert-triangle" style="width: 18px; height: 18px;"></i>
+                <div><strong>ข้อควรระวัง:</strong> การตั้งค่า refresh ต่ำกว่า 30 วินาทีอาจถูกบล็อก IP</div>
+            </div>
+        </section>
+
+        <section class="api-docs">
+            <h2><i data-lucide="book-open" style="width: 24px; height: 24px;"></i> วิธีใช้งาน API</h2>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <a href="/api/gold/current" target="_blank" class="endpoint-url">/api/gold/current</a>
+                </div>
+                <p class="endpoint-desc">ราคาทองปัจจุบัน</p>
+            </div>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <a href="/api/gold/bar" target="_blank" class="endpoint-url">/api/gold/bar</a>
+                </div>
+                <p class="endpoint-desc">ทองแท่ง</p>
+            </div>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <a href="/api/gold/ornament" target="_blank" class="endpoint-url">/api/gold/ornament</a>
+                </div>
+                <p class="endpoint-desc">ทองรูปพรรณ</p>
+            </div>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <a href="/api/gold/history?limit=60" target="_blank"
+                        class="endpoint-url">/api/gold/history?limit=60</a>
+                </div>
+                <p class="endpoint-desc">ราคาย้อนหลัง</p>
+            </div>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <a href="/api/gold/history/today" target="_blank" class="endpoint-url">/api/gold/history/today</a>
+                </div>
+                <p class="endpoint-desc">ราคาย้อนหลังเฉพาะวันนี้</p>
+            </div>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <a href="/api/gold/summary" target="_blank" class="endpoint-url">/api/gold/summary</a>
+                </div>
+                <p class="endpoint-desc">สถิติ (สูงสุด/ต่ำสุด/เฉลี่ย)</p>
+            </div>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <a href="/api/health" target="_blank" class="endpoint-url">/api/health</a>
+                </div>
+                <p class="endpoint-desc">สถานะ API</p>
+            </div>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <code class="endpoint-url">/api/gold/refresh</code>
+                </div>
+                <p class="endpoint-desc">บังคับรีเฟรช</p>
+            </div>
+
+            <div class="code-example">
+                <h4><i data-lucide="plug" style="width: 18px; height: 18px;"></i> WordPress (PHP)</h4>
+                <pre><code id="phpCode"></code></pre>
+            </div>
+
+            <div class="code-example">
+                <h4><i data-lucide="globe" style="width: 18px; height: 18px;"></i> JavaScript</h4>
+                <pre><code id="jsCode"></code></pre>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <p><i data-lucide="zap" style="width: 14px; height: 14px; display: inline;"></i>
+                ข้อมูลจาก <a href="https://ราคาทองคําวันนี้.com">สมาคมค้าทองคำ</a></p>
+        </footer>
+    </div>
+
+    <div class="toast" id="toast">
+        <i data-lucide="check-circle" style="width: 20px; height: 20px;"></i>
+        <span id="toastMessage">บันทึกสำเร็จ!</span>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        const baseUrl = window.location.origin;
+
+        document.getElementById('phpCode').textContent = `<?php
+$response = wp_remote_get('${baseUrl}/api/gold/current');
+$gold = json_decode(wp_remote_retrieve_body($response), true);
+if ($gold['success']) {
+    echo 'ทองแท่ง: ' . number_format($gold['gold_bar']['sell']) . ' บาท';
+}
+?>`;
+
+        document.getElementById('jsCode').textContent = `fetch('${baseUrl}/api/gold/current')
+  .then(res => res.json())
+  .then(data => console.log('ทองแท่ง:', data.gold_bar.sell));`;
+
+        // State
+        let refreshIntervalSec = 60;
+        let refreshTimer = null;
+        let countdownTimer = null;
+        let countdown = 60;
+        let adaptiveEnabled = false;
+
+        // Countdown functions
+        function startCountdown() {
+            countdown = refreshIntervalSec;
+            updateCountdownDisplay();
+
+            if (countdownTimer) clearInterval(countdownTimer);
+            countdownTimer = setInterval(() => {
+                countdown--;
+                if (countdown <= 0) {
+                    countdown = refreshIntervalSec;
+                }
+                updateCountdownDisplay();
+            }, 1000);
+        }
+
+        function updateCountdownDisplay() {
+            document.getElementById('countdown').textContent = countdown;
+        }
+
+        function resetCountdown() {
+            countdown = refreshIntervalSec;
+            updateCountdownDisplay();
+        }
+
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                if (data.success) {
+                    adaptiveEnabled = data.settings.adaptive_enabled;
+                    refreshIntervalSec = data.settings.base_interval;
+
+                    document.getElementById('refreshInterval').value = data.settings.base_interval;
+                    document.getElementById('currentInterval').textContent = data.settings.base_interval;
+                    document.getElementById('adaptiveToggle').checked = adaptiveEnabled;
+                    document.getElementById('manualToggle').checked = !adaptiveEnabled;
+                    document.getElementById('adaptiveInterval').textContent = data.settings.current_interval;
+                    document.getElementById('unchangedCount').textContent = data.settings.unchanged_count;
+
+                    updateToggleUI();
+                }
+            } catch (e) { console.error('Failed to load settings:', e); }
+        }
+
+        function updateToggleUI() {
+            document.getElementById('manualContent').classList.toggle('hidden', adaptiveEnabled);
+            document.getElementById('adaptiveContent').classList.toggle('hidden', !adaptiveEnabled);
+        }
+
+        async function toggleManualMode() {
+            const checked = document.getElementById('manualToggle').checked;
+            if (checked) {
+                document.getElementById('adaptiveToggle').checked = false;
+                adaptiveEnabled = false;
+                await saveSettings({ adaptive_enabled: false });
+            }
+            updateToggleUI();
+        }
+
+        async function toggleAdaptiveMode() {
+            const checked = document.getElementById('adaptiveToggle').checked;
+            adaptiveEnabled = checked;
+            document.getElementById('manualToggle').checked = !checked;
+            await saveSettings({ adaptive_enabled: checked });
+            updateToggleUI();
+        }
+
+        async function saveManualSettings() {
+            let interval = parseInt(document.getElementById('refreshInterval').value) || 120;
+
+            // Auto-clamp to valid range
+            if (interval < 60) interval = 60;
+            if (interval > 500) interval = 500;
+
+            document.getElementById('refreshInterval').value = interval;
+            if (interval < 60 || interval > 500) {
+                showToast('กรุณาใส่ค่า 60-500 วินาที', true);
+                return;
+            }
+            await saveSettings({ base_interval: interval });
+            refreshIntervalSec = interval;
+            document.getElementById('currentInterval').textContent = interval;
+            startAutoRefresh();
+        }
+
+        async function saveSettings(settings) {
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('บันทึกสำเร็จ!');
+                    loadSettings();
+                } else {
+                    showToast(data.error || 'เกิดข้อผิดพลาด', true);
+                }
+            } catch (e) {
+                showToast('เกิดข้อผิดพลาด', true);
+            }
+        }
+
+        function formatNumber(num) {
+            if (num == null) return '-';
+            return num.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatDateTime(isoString) {
+            if (!isoString) return '-';
+            return new Date(isoString).toLocaleString('th-TH', {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.toggle('error', isError);
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function updatePrices(data) {
+            if (!data.success) return;
+
+            document.getElementById('barBuy').textContent = formatNumber(data.gold_bar?.buy) + ' ฿';
+            document.getElementById('barSell').textContent = formatNumber(data.gold_bar?.sell) + ' ฿';
+            document.getElementById('ornamentBuy').textContent = formatNumber(data.gold_ornament?.buy) + ' ฿';
+            document.getElementById('ornamentSell').textContent = formatNumber(data.gold_ornament?.sell) + ' ฿';
+
+            // Latest change (▲ 50)
+            const changeEl = document.getElementById('priceChange');
+            const change = data.price_change || {};
+            const amount = change.amount || 0;
+            const direction = change.direction || 'unchanged';
+
+            changeEl.className = 'price-change ' + direction;
+            if (direction === 'up') {
+                changeEl.innerHTML = '<i data-lucide="trending-up" style="width:14px;height:14px;"></i> +' + formatNumber(amount);
+            } else if (direction === 'down') {
+                changeEl.innerHTML = '<i data-lucide="trending-down" style="width:14px;height:14px;"></i> -' + formatNumber(amount);
+            } else {
+                changeEl.innerHTML = '<i data-lucide="minus" style="width:14px;height:14px;"></i> ไม่เปลี่ยนแปลง';
+            }
+
+            // Today's total change (วันนี้ -100) from API
+            const todayChangeEl = document.getElementById('todayChange');
+            const todayChange = data.today_change || {};
+            const todayAmount = todayChange.amount || 0;
+            const todayDirection = todayChange.direction || 'unchanged';
+
+            if (todayAmount > 0) {
+                if (todayDirection === 'up') {
+                    todayChangeEl.innerHTML = '<span class="change-item positive"><i data-lucide="trending-up" style="width:12px;height:12px;"></i> +' + formatNumber(todayAmount) + '</span>';
+                } else if (todayDirection === 'down') {
+                    todayChangeEl.innerHTML = '<span class="change-item negative"><i data-lucide="trending-down" style="width:12px;height:12px;"></i> -' + formatNumber(todayAmount) + '</span>';
+                } else {
+                    // If direction is unchanged but amount > 0, show as positive
+                    todayChangeEl.innerHTML = '<span class="change-item positive"><i data-lucide="trending-up" style="width:12px;height:12px;"></i> +' + formatNumber(todayAmount) + '</span>';
+                }
+            } else {
+                todayChangeEl.innerHTML = '<span style="color:#888;">ไม่มีการเปลี่ยนแปลง</span>';
+            }
+
+            document.getElementById('changeCount').textContent = data.change_count ? '(ครั้งที่ ' + data.change_count + ')' : '';
+            document.getElementById('lastUpdate').textContent = 'อัพเดทล่าสุด: ' + formatDateTime(data.timestamp);
+
+            lucide.createIcons();
+        }
+
+        async function fetchPrices() {
+            try {
+                const res = await fetch('/api/gold/current');
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                if (!data.success) {
+                    showToast(data.error || 'Failed to fetch prices', true);
+                    document.getElementById('lastUpdate').textContent = 'Error loading data';
+                    return;
+                }
+                updatePrices(data);
+                loadSettings();
+                resetCountdown();
+            } catch (e) {
+                console.error('Error:', e);
+                showToast('Failed to connect to server', true);
+                document.getElementById('lastUpdate').textContent = 'Connection error';
+            }
+        }
+
+        async function refreshPrices() {
+            const btn = document.querySelector('.refresh-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Loading...';
+
+            try {
+                const res = await fetch('/api/gold/refresh', { method: 'POST' });
+                const data = await res.json();
+                
+                if (res.status === 429) {
+                    showToast(data.error || 'Rate limited', true);
+                    return;
+                }
+                
+                if (!data.success) {
+                    showToast(data.error || 'Refresh failed', true);
+                    return;
+                }
+                
+                updatePrices(data.data);
+                showToast('Refresh successful!');
+                loadSettings();
+                resetCountdown();
+            } catch (e) {
+                showToast('Connection error', true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i> Refresh';
+                lucide.createIcons();
+            }
+        }
+
+        function startAutoRefresh() {
+            if (refreshTimer) clearInterval(refreshTimer);
+            refreshTimer = setInterval(fetchPrices, refreshIntervalSec * 1000);
+            startCountdown();
+        }
+
+        // Logic for auto-clamping values when user types
+        document.getElementById('refreshInterval').addEventListener('blur', function () {
+            let val = parseInt(this.value);
+            if (isNaN(val)) val = 120;
+            if (val < 60) val = 60;
+            if (val > 500) val = 500;
+            this.value = val;
+        });
+
+        // Init
+        loadSettings();
+        fetchPrices();
+        startAutoRefresh();
+    </script>
+</body>
+
+</html>
