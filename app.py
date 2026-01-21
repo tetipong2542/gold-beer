@@ -46,6 +46,11 @@ adaptive_settings = {
     "current_interval": 120,  # Current active interval
 }
 
+# WordPress API settings
+wp_api_settings = {
+    "enabled": True,  # Enable/disable WP API access
+}
+
 
 def load_history():
     """Load price history from file on startup"""
@@ -211,6 +216,13 @@ def dashboard():
 def get_current_price():
     """Get current gold prices"""
     with data_lock:
+        if not wp_api_settings["enabled"]:
+            return jsonify({
+                "success": False,
+                "error": "API_DISABLED",
+                "message": "Update! โปรดติดต่อ Developer"
+            }), 503
+        
         if not current_price:
             return jsonify({
                 "success": False,
@@ -388,7 +400,8 @@ def get_settings():
                 "adaptive_enabled": adaptive_settings["adaptive_enabled"],
                 "base_interval": adaptive_settings["base_interval"],
                 "current_interval": adaptive_settings["current_interval"],
-                "unchanged_count": adaptive_settings["unchanged_count"]
+                "unchanged_count": adaptive_settings["unchanged_count"],
+                "wp_api_enabled": wp_api_settings["enabled"]
             }
         })
 
@@ -396,7 +409,7 @@ def get_settings():
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     """Update adaptive refresh settings"""
-    global adaptive_settings
+    global adaptive_settings, wp_api_settings
     
     data = request.get_json() or {}
     
@@ -414,13 +427,18 @@ def update_settings():
             else:
                 return jsonify({"success": False, "error": "Interval must be 60-500 seconds"}), 400
         
+        if "wp_api_enabled" in data:
+            wp_api_settings["enabled"] = bool(data["wp_api_enabled"])
+            logger.info(f"🔧 WP API: {'enabled' if wp_api_settings['enabled'] else 'disabled'}")
+        
         return jsonify({
             "success": True,
             "message": "Settings updated",
             "settings": {
                 "adaptive_enabled": adaptive_settings["adaptive_enabled"],
                 "base_interval": adaptive_settings["base_interval"],
-                "current_interval": adaptive_settings["current_interval"]
+                "current_interval": adaptive_settings["current_interval"],
+                "wp_api_enabled": wp_api_settings["enabled"]
             }
         })
 

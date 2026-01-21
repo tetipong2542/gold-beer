@@ -1199,27 +1199,39 @@ if ($gold['success']) {
         });
 
         // WordPress Plugin API Toggle Functions
-        function toggleWpApi() {
+        async function toggleWpApi() {
             const toggle = document.getElementById('wpApiToggle');
             const content = document.getElementById('wpApiContent');
             const status = document.getElementById('wpApiStatus');
             const isEnabled = toggle.checked;
 
-            // Save to localStorage
-            localStorage.setItem('wpApiEnabled', isEnabled);
-
-            // Update UI
-            if (isEnabled) {
-                content.classList.remove('hidden');
-                status.textContent = 'เปิดใช้งาน';
-                status.style.color = 'var(--green)';
-            } else {
-                content.classList.add('hidden');
-                status.textContent = 'ปิดใช้งาน';
-                status.style.color = 'var(--red)';
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ wp_api_enabled: isEnabled })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    if (isEnabled) {
+                        content.classList.remove('hidden');
+                        status.textContent = 'เปิดใช้งาน';
+                        status.style.color = 'var(--green)';
+                    } else {
+                        content.classList.add('hidden');
+                        status.textContent = 'ปิดใช้งาน';
+                        status.style.color = 'var(--red)';
+                    }
+                    showToast(isEnabled ? 'WordPress API เปิดใช้งาน' : 'WordPress API ปิดใช้งาน');
+                } else {
+                    toggle.checked = !isEnabled;
+                    showToast(data.error || 'เกิดข้อผิดพลาด', true);
+                }
+            } catch (e) {
+                toggle.checked = !isEnabled;
+                showToast('เกิดข้อผิดพลาด', true);
             }
-
-            showToast(isEnabled ? 'WordPress API เปิดใช้งาน' : 'WordPress API ปิดใช้งาน');
         }
 
         function copyApiUrl() {
@@ -1235,22 +1247,28 @@ if ($gold['success']) {
         }
 
         function loadWpApiSettings() {
-            const enabled = localStorage.getItem('wpApiEnabled');
-            const toggle = document.getElementById('wpApiToggle');
-            const content = document.getElementById('wpApiContent');
-            const status = document.getElementById('wpApiStatus');
+            fetch('/api/settings')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const enabled = data.settings.wp_api_enabled;
+                        const toggle = document.getElementById('wpApiToggle');
+                        const content = document.getElementById('wpApiContent');
+                        const status = document.getElementById('wpApiStatus');
 
-            if (enabled === 'false') {
-                toggle.checked = false;
-                content.classList.add('hidden');
-                status.textContent = 'ปิดใช้งาน';
-                status.style.color = 'var(--red)';
-            } else {
-                toggle.checked = true;
-                content.classList.remove('hidden');
-                status.textContent = 'เปิดใช้งาน';
-                status.style.color = 'var(--green)';
-            }
+                        toggle.checked = enabled;
+                        if (enabled) {
+                            content.classList.remove('hidden');
+                            status.textContent = 'เปิดใช้งาน';
+                            status.style.color = 'var(--green)';
+                        } else {
+                            content.classList.add('hidden');
+                            status.textContent = 'ปิดใช้งาน';
+                            status.style.color = 'var(--red)';
+                        }
+                    }
+                })
+                .catch(e => console.error('Failed to load WP API settings:', e));
         }
 
         // Init
