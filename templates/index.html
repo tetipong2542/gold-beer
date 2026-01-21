@@ -783,6 +783,60 @@
                 </div>
             </div>
 
+            <!-- WordPress Plugin API Control -->
+            <div class="toggle-section">
+                <div class="toggle-header">
+                    <div class="toggle-title">
+                        <i data-lucide="plug" style="width: 20px; height: 20px; color: var(--gold);"></i>
+                        WordPress Plugin API
+                        <span class="badge" style="background: var(--gold); color: #000;">WP</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="wpApiToggle" checked onchange="toggleWpApi()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <p class="toggle-desc">
+                    เปิด/ปิด การดึงข้อมูลราคาทองสำหรับ WordPress Plugin
+                </p>
+
+                <div class="toggle-content" id="wpApiContent">
+                    <div class="settings-form">
+                        <div class="form-group" style="flex: 1;">
+                            <label>API URL:</label>
+                            <input type="text" id="wpApiUrl" value="https://gold-beer-production.up.railway.app"
+                                style="width: 100%; max-width: 400px; text-align: left;" readonly>
+                        </div>
+                        <button class="save-btn" onclick="copyApiUrl()" style="background: var(--blue);">
+                            <i data-lucide="copy" style="width: 16px; height: 16px;"></i>
+                            Copy URL
+                        </button>
+                    </div>
+
+                    <div class="adaptive-status" style="margin-top: 16px;">
+                        <div class="status-item">
+                            <i data-lucide="server" style="width: 14px; height: 14px;"></i>
+                            สถานะ: <span id="wpApiStatus" style="color: var(--green);">เปิดใช้งาน</span>
+                        </div>
+                        <div class="status-item">
+                            <i data-lucide="clock" style="width: 14px; height: 14px;"></i>
+                            Cache: <span>300 วินาที</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-info" style="margin-top: 16px;">
+                        <i data-lucide="info" style="width: 18px; height: 18px;"></i>
+                        <div>
+                            <strong>Shortcodes:</strong>
+                            <code
+                                style="background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px;">[gold_price]</code>
+                            <code
+                                style="background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px;">[calculator]</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="settings-info settings-warning">
                 <i data-lucide="alert-triangle" style="width: 18px; height: 18px;"></i>
                 <div><strong>ข้อควรระวัง:</strong> การตั้งค่า refresh ต่ำกว่า 30 วินาทีอาจถูกบล็อก IP</div>
@@ -1105,17 +1159,17 @@ if ($gold['success']) {
             try {
                 const res = await fetch('/api/gold/refresh', { method: 'POST' });
                 const data = await res.json();
-                
+
                 if (res.status === 429) {
                     showToast(data.error || 'Rate limited', true);
                     return;
                 }
-                
+
                 if (!data.success) {
                     showToast(data.error || 'Refresh failed', true);
                     return;
                 }
-                
+
                 updatePrices(data.data);
                 showToast('Refresh successful!');
                 loadSettings();
@@ -1144,8 +1198,64 @@ if ($gold['success']) {
             this.value = val;
         });
 
+        // WordPress Plugin API Toggle Functions
+        function toggleWpApi() {
+            const toggle = document.getElementById('wpApiToggle');
+            const content = document.getElementById('wpApiContent');
+            const status = document.getElementById('wpApiStatus');
+            const isEnabled = toggle.checked;
+
+            // Save to localStorage
+            localStorage.setItem('wpApiEnabled', isEnabled);
+
+            // Update UI
+            if (isEnabled) {
+                content.classList.remove('hidden');
+                status.textContent = 'เปิดใช้งาน';
+                status.style.color = 'var(--green)';
+            } else {
+                content.classList.add('hidden');
+                status.textContent = 'ปิดใช้งาน';
+                status.style.color = 'var(--red)';
+            }
+
+            showToast(isEnabled ? 'WordPress API เปิดใช้งาน' : 'WordPress API ปิดใช้งาน');
+        }
+
+        function copyApiUrl() {
+            const urlInput = document.getElementById('wpApiUrl');
+            navigator.clipboard.writeText(urlInput.value).then(() => {
+                showToast('คัดลอก URL แล้ว!');
+            }).catch(() => {
+                // Fallback for older browsers
+                urlInput.select();
+                document.execCommand('copy');
+                showToast('คัดลอก URL แล้ว!');
+            });
+        }
+
+        function loadWpApiSettings() {
+            const enabled = localStorage.getItem('wpApiEnabled');
+            const toggle = document.getElementById('wpApiToggle');
+            const content = document.getElementById('wpApiContent');
+            const status = document.getElementById('wpApiStatus');
+
+            if (enabled === 'false') {
+                toggle.checked = false;
+                content.classList.add('hidden');
+                status.textContent = 'ปิดใช้งาน';
+                status.style.color = 'var(--red)';
+            } else {
+                toggle.checked = true;
+                content.classList.remove('hidden');
+                status.textContent = 'เปิดใช้งาน';
+                status.style.color = 'var(--green)';
+            }
+        }
+
         // Init
         loadSettings();
+        loadWpApiSettings();
         fetchPrices();
         startAutoRefresh();
     </script>
