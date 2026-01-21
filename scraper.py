@@ -73,8 +73,9 @@ class GoldPriceScraper:
             "gold_bar": {"buy": None, "sell": None},
             "gold_ornament": {"buy": None, "sell": None},
             "update_time": None,
-            "price_change": {"amount": 0, "direction": "unchanged"},  # Latest change (▲ 50)
-            "today_change": {"amount": 0, "direction": "unchanged"},  # Today total (วันนี้ -100)
+            "update_date": None,
+            "price_change": {"amount": 0, "direction": "unchanged"},
+            "today_change": {"amount": 0, "direction": "unchanged"},
             "change_count": 0,
             "source": GOLD_PRICE_URL,
             "error": None
@@ -202,6 +203,15 @@ class GoldPriceScraper:
             count_match = re.search(r'ครั้งที่\s*(\d+)', soup.get_text())
             if count_match:
                 result["change_count"] = int(count_match.group(1))
+            
+            if divgta:
+                txtd_cells = divgta.find_all('td', class_='txtd')
+                for td in txtd_cells:
+                    text = td.get_text(strip=True)
+                    if re.search(r'\d+\s+\S+\s+\d{4}', text):
+                        result["update_date"] = text
+                    elif 'เวลา' in text:
+                        result["update_time"] = text
             
             # Validate we got actual data
             if result["gold_bar"]["buy"] or result["gold_ornament"]["buy"]:
