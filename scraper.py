@@ -6,7 +6,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)

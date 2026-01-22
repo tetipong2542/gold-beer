@@ -4,7 +4,7 @@ Provides REST API endpoints for Thai gold prices with auto-refresh every 1 minut
 """
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import deque
 from threading import Lock
 from flask import Flask, jsonify, request, render_template
@@ -35,7 +35,6 @@ price_history = deque(maxlen=1440)  # Store 24 hours of data (1 per minute)
 # Configuration
 FETCH_INTERVAL_MINUTES = 1
 HISTORY_FILE = "gold_price_history.json"
-SETTINGS_FILE = "gold_settings.json"
 
 # Adaptive refresh settings
 adaptive_settings = {
@@ -128,8 +127,7 @@ def fetch_gold_prices():
 def adjust_refresh_interval():
     """Adjust refresh interval based on price activity"""
     global adaptive_settings
-    
-    from datetime import datetime
+
     now = datetime.now()
     hour = now.hour
     weekday = now.weekday()  # 0=Monday, 6=Sunday
@@ -296,7 +294,6 @@ def get_history():
 @app.route('/api/gold/history/today')
 def get_history_today():
     """Get today's price history only"""
-    from datetime import datetime
     today = datetime.now().strftime('%Y-%m-%d')
     
     with data_lock:
@@ -316,8 +313,6 @@ def get_history_today():
 @app.route('/api/gold/refresh', methods=['POST'])
 def refresh_prices():
     """Force refresh gold prices (with rate limiting)"""
-    from datetime import datetime, timedelta
-    
     with data_lock:
         last_update = current_price.get("timestamp")
         if last_update:
