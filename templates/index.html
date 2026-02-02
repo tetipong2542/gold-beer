@@ -730,13 +730,13 @@
                         <span class="slider"></span>
                     </label>
                 </div>
-                <p class="toggle-desc">กำหนดความถี่ในการดึงราคาด้วยตนเอง (60-500 วินาที)</p>
+                <p class="toggle-desc">กำหนดความถี่ในการดึงราคาด้วยตนเอง (60-600 วินาที)</p>
 
                 <div class="toggle-content" id="manualContent">
                     <div class="settings-form">
                         <div class="form-group">
                             <label>รีเฟรชทุก</label>
-                            <input type="number" id="refreshInterval" min="60" max="500" value="120">
+                            <input type="number" id="refreshInterval" min="60" max="600" value="120">
                             <label>วินาที</label>
                         </div>
                         <button class="save-btn" onclick="saveManualSettings()">
@@ -744,6 +744,12 @@
                             บันทึก
                         </button>
                         <span class="current-interval">ปัจจุบัน: <span id="currentInterval">120</span> วินาที</span>
+                    </div>
+                    <div class="settings-info" style="margin-top: 16px;">
+                        <i data-lucide="info" style="width: 18px; height: 18px;"></i>
+                        <div>
+                            <strong>แนะนำ:</strong> 120-300 วินาที (2-5 นาที) เนื่องจากสมาคมประกาศราคาเฉลี่ย 12-15 นาที/ครั้ง
+                        </div>
                     </div>
                 </div>
             </div>
@@ -839,7 +845,7 @@
 
             <div class="settings-info settings-warning">
                 <i data-lucide="alert-triangle" style="width: 18px; height: 18px;"></i>
-                <div><strong>ข้อควรระวัง:</strong> การตั้งค่า refresh ต่ำกว่า 30 วินาทีอาจถูกบล็อก IP</div>
+                <div><strong>ข้อมูลดี:</strong> API ไม่มี rate limit แต่ราคาอัพเดทเฉลี่ย 12-15 นาที/ครั้ง ไม่จำเป็นต้องรีเฟรชบ่อยเกินไป</div>
             </div>
         </section>
 
@@ -1031,8 +1037,8 @@ if ($gold['success']) {
             if (interval > 500) interval = 500;
 
             document.getElementById('refreshInterval').value = interval;
-            if (interval < 60 || interval > 500) {
-                showToast('กรุณาใส่ค่า 60-500 วินาที', true);
+            if (interval < 60 || interval > 600) {
+                showToast('กรุณาใส่ค่า 60-600 วินาที', true);
                 return;
             }
             await saveSettings({ base_interval: interval });
@@ -1194,7 +1200,7 @@ if ($gold['success']) {
             let val = parseInt(this.value);
             if (isNaN(val)) val = 120;
             if (val < 60) val = 60;
-            if (val > 500) val = 500;
+            if (val > 600) val = 600;
             this.value = val;
         });
 

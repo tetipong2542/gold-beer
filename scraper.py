@@ -1,34 +1,28 @@
 """
 Gold Price Scraper Module
 Scrapes gold prices from ราคาทองคําวันนี้.com
+Uses Playwright to bypass Cloudflare protection
 """
 import re
-import requests
+import os
 from bs4 import BeautifulSoup
 from datetime import datetime
 from typing import Optional
 import logging
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright_stealth import Stealth
 
 logger = logging.getLogger(__name__)
 
 # Target URL (Punycode encoded Thai domain)
 GOLD_PRICE_URL = "https://xn--42cah7d0cxcvbbb9x.com/"
 
-# Headers to mimic browser request
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Accept-Language": "th,en-US;q=0.7,en;q=0.3",
-    "Connection": "keep-alive",
-}
-
 
 class GoldPriceScraper:
-    """Scraper class for Thai gold prices"""
+    """Scraper class for Thai gold prices using Playwright"""
     
     def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update(HEADERS)
+        self.timeout = 30000  # 30 seconds timeout
         
     def _parse_price(self, text: str) -> Optional[float]:
         """Extract numeric price from text"""
@@ -59,9 +53,9 @@ class GoldPriceScraper:
             
         return change
     
-    def scrape(self) -> dict:
+    def scrape(self, use_persistent_session: bool = True) -> dict:
         """
-        Scrape current gold prices from the website
+        Scrape current gold prices from the website using Playwright
         
         Returns:
             dict: Contains gold_bar, gold_ornament prices with buy/sell,
@@ -82,11 +76,108 @@ class GoldPriceScraper:
         }
         
         try:
-            response = self.session.get(GOLD_PRICE_URL, timeout=30)
-            response.raise_for_status()
-            response.encoding = 'utf-8'
+            browser = None  # Initialize for cleanup
+            with sync_playwright() as p:
+                if use_persistent_session:
+                    # วิธี #5: Session Reuse (แนะนำ)
+                    # ครั้งแรก: headless=False → manual solve Turnstile
+                    # ครั้งต่อไป: headless=True → ใช้ session ซ้ำ
+                    session_dir = "./cloudflare_session"
+                    is_first_run = not os.path.exists(session_dir)
+                    
+                    context = p.chromium.launch_persistent_context(
+                        user_data_dir=session_dir,
+                        headless=False if is_first_run else True,  # ครั้งแรกเปิด GUI
+                        viewport={"width": 1920, "height": 1080},
+                        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        locale="th-TH",
+                        timezone_id="Asia/Bangkok",
+                        args=[
+                            '--disable-blink-features=AutomationControlled',
+                            '--no-sandbox',
+                            '--disable-dev-shm-usage',
+                        ]
+                    )
+                    
+                    page = context.pages[0] if context.pages else context.new_page()
+                    
+                    if is_first_run:
+                        logger.warning("⚠️  FIRST RUN: Please solve Cloudflare Turnstile manually in the browser window")
+                        logger.warning("⚠️  After solving, the session will be saved for future use")
+                else:
+                    # วิธี #1+#2: Stealth mode (fallback)
+                    browser = p.chromium.launch(
+                        headless=True,
+                        args=[
+                            '--disable-blink-features=AutomationControlled',
+                            '--no-sandbox',
+                            '--disable-dev-shm-usage',
+                        ]
+                    )
+                    
+                    context = browser.new_context(
+                        viewport={"width": 1920, "height": 1080},
+                        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        locale="th-TH",
+                        timezone_id="Asia/Bangkok",
+                    )
+                    
+                    page = context.new_page()
+                    
+                    # Apply stealth mode
+                    stealth = Stealth()
+                    stealth.apply_stealth_sync(page)
+                
+                # Navigate to URL
+                logger.info(f"Loading {GOLD_PRICE_URL}...")
+                page.goto(GOLD_PRICE_URL, wait_until="load", timeout=self.timeout)
+                
+                # Wait a bit for any dynamic content / Cloudflare
+                if use_persistent_session:
+                    session_dir = "./cloudflare_session"
+                    if not os.path.exists(session_dir) or len(os.listdir(session_dir)) == 0:
+                        # ครั้งแรก: รอให้ user solve Turnstile
+                        logger.info("Waiting 30 seconds for manual Turnstile solve...")
+                        page.wait_for_timeout(30000)  # 30 วินาที
+                    else:
+                        page.wait_for_timeout(3000)
+                else:
+                    page.wait_for_timeout(3000)
+                
+                # Wait for Cloudflare challenge to complete (if any)
+                # Look for the gold price table to ensure page is fully loaded
+                try:
+                    page.wait_for_selector('.divgta, table, body', timeout=10000)
+                    logger.info("Page loaded successfully")
+                except PlaywrightTimeoutError:
+                    logger.warning("Timeout waiting for content, trying to parse anyway")
+                
+                # Take screenshot for debugging (optional)
+                # page.screenshot(path="debug_screenshot.png")
+                
+                # Get page content
+                html_content = page.content()
+                
+                # Debug: Save HTML to file for inspection
+                with open('/tmp/gold_page_debug.html', 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                logger.info("Saved HTML to /tmp/gold_page_debug.html for debugging")
+                
+                # Debug: Check if we got Cloudflare challenge page
+                if "just a moment" in html_content.lower() or "checking your browser" in html_content.lower():
+                    logger.error("Still blocked by Cloudflare challenge page")
+                    result["error"] = "Blocked by Cloudflare - challenge page detected"
+                    browser.close()
+                    return result
+                
+                # Close browser/context
+                if use_persistent_session:
+                    context.close()
+                elif browser:
+                    browser.close()
             
-            soup = BeautifulSoup(response.text, 'lxml')
+            # Parse with BeautifulSoup
+            soup = BeautifulSoup(html_content, 'lxml')
             
             # Method 1: Find by table structure with divgta class
             divgta = soup.find('div', class_='divgta')
@@ -178,7 +269,7 @@ class GoldPriceScraper:
                 # Find today's change - look for td with "วันนี้" text and g-u or g-d class
                 for td in divgta.find_all('td', class_=re.compile(r'g-[ud]')):
                     text = td.get_text(strip=True)
-                    classes = td.get('class', [])
+                    classes = td.get('class') or []
                     
                     if 'วันนี้' in text:
                         # Extract number after วันนี้
@@ -190,7 +281,7 @@ class GoldPriceScraper:
                                 result["today_change"] = {"amount": int(amount), "direction": direction}
                     
                     # Find latest price change - element with al-l class and contains just a number (possibly with +/-)
-                    elif 'al-l' in classes and 'em' in classes:
+                    elif classes and 'al-l' in classes and 'em' in classes:
                         # This is the latest change cell like "-150" or "+50"
                         match = re.search(r'^([+-]?[0-9,]+)$', text)
                         if match:
@@ -221,9 +312,9 @@ class GoldPriceScraper:
                 result["error"] = "Could not parse gold prices from page"
                 logger.warning("Failed to parse gold prices from page content")
                 
-        except requests.RequestException as e:
-            result["error"] = f"Request failed: {str(e)}"
-            logger.error(f"Request error: {e}")
+        except PlaywrightTimeoutError as e:
+            result["error"] = f"Timeout: {str(e)}"
+            logger.error(f"Playwright timeout error: {e}")
         except Exception as e:
             result["error"] = f"Scraping failed: {str(e)}"
             logger.error(f"Scraping error: {e}")

@@ -11,7 +11,7 @@ from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from scraper import scrape_gold_prices
+from scraper_api import scrape_gold_prices_api  # Use API instead of scraping
 import logging
 import atexit
 import sys
@@ -36,13 +36,12 @@ price_history = deque(maxlen=1440)  # Store 24 hours of data (1 per minute)
 FETCH_INTERVAL_MINUTES = 1
 HISTORY_FILE = "gold_price_history.json"
 
-# Adaptive refresh settings
 adaptive_settings = {
-    "adaptive_enabled": False,
-    "base_interval": 120,  # Base interval in seconds
-    "unchanged_count": 0,  # Count of consecutive unchanged prices
-    "last_change_count": None,  # Last change_count from source
-    "current_interval": 120,  # Current active interval
+    "adaptive_enabled": True,
+    "base_interval": 120,
+    "unchanged_count": 0,
+    "last_change_count": None,
+    "current_interval": 120,
 }
 
 # WordPress API settings
@@ -75,11 +74,10 @@ def save_history():
 
 
 def fetch_gold_prices():
-    """Fetch and store gold prices with smart caching"""
     global current_price, adaptive_settings
     
-    logger.info("Fetching gold prices...")
-    result = scrape_gold_prices()
+    logger.info("Fetching gold prices from API...")
+    result = scrape_gold_prices_api()
     
     with data_lock:
         if result.get("success"):
@@ -199,8 +197,10 @@ init_app()
 def index():
     """API information endpoint"""
     return jsonify({
-        "name": "Thai Gold Price API DEV Thai",
-        "version": "1.0.0",
+        "name": "Thai Gold Price API",
+        "version": "2.0.0",
+        "data_source": "GoldTraders.or.th Official API (static-gold.tothanate.workers.dev)",
+        "note": "No Cloudflare bypass needed - direct API access"
     })
 
 
@@ -415,12 +415,12 @@ def update_settings():
         
         if "base_interval" in data:
             interval = int(data["base_interval"])
-            if 60 <= interval <= 500:
+            if 60 <= interval <= 600:
                 adaptive_settings["base_interval"] = interval
                 adaptive_settings["current_interval"] = interval
                 logger.info(f"🔧 Base interval: {interval}s")
             else:
-                return jsonify({"success": False, "error": "Interval must be 60-500 seconds"}), 400
+                return jsonify({"success": False, "error": "Interval must be 60-600 seconds"}), 400
         
         if "wp_api_enabled" in data:
             wp_api_settings["enabled"] = bool(data["wp_api_enabled"])
