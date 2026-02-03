@@ -71,7 +71,12 @@ def scrape_gold_prices_api() -> dict:
         metadata = data.get("metadata", {})
         result["update_date"] = metadata.get("publish_date")
         result["update_time"] = metadata.get("last_updated")
-        result["change_count"] = len(data.get("history", []))
+        
+        # Extract change count from update_info (e.g., "ประกาศวันที่ 03/02/2569 เวลา 10:54 น. (ครั้งที่ 19)")
+        update_info = metadata.get("update_info", "")
+        import re
+        count_match = re.search(r'ครั้งที่\s*(\d+)', update_info)
+        result["change_count"] = int(count_match.group(1)) if count_match else 0
         
         result["success"] = True
         logger.info(f"Successfully fetched from API: Bar={result['gold_bar']}")
