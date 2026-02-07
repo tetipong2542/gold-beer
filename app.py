@@ -148,30 +148,24 @@ def fetch_gold_prices_job():
 
 
 def adjust_refresh_interval():
-    """Adjust refresh interval based on price activity"""
     global adaptive_settings
 
     now = datetime.now()
     hour = now.hour
-    weekday = now.weekday()  # 0=Monday, 6=Sunday
+    weekday = now.weekday()
     
     base = adaptive_settings["base_interval"]
     unchanged = adaptive_settings["unchanged_count"]
     
-    # Weekend or outside trading hours (before 9AM or after 5PM)
     is_off_hours = weekday >= 5 or hour < 9 or hour >= 17
     
     if is_off_hours:
-        # Outside trading hours: use longer intervals
-        new_interval = base * 5  # 5x base interval
+        new_interval = base * 10
     elif unchanged >= 10:
-        # 10+ unchanged: double the interval (max 5x)
-        new_interval = min(base * 2, base * 5)
+        new_interval = base * 5
     elif unchanged >= 5:
-        # 5-9 unchanged: 1.5x interval
-        new_interval = int(base * 1.5)
+        new_interval = base * 3
     else:
-        # Active trading: use base interval
         new_interval = base
     
     if new_interval != adaptive_settings["current_interval"]:
