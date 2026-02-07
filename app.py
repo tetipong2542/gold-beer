@@ -59,6 +59,12 @@ gold_source_settings = {
     "last_source_used": None,
 }
 
+quiet_hours_settings = {
+    "enabled": True,
+    "weekday": {"start": "18:00", "end": "08:00"},
+    "weekend": {"start": "18:00", "end": "08:00"},
+}
+
 
 def load_history():
     """Load price history from file on startup"""
@@ -83,6 +89,30 @@ def save_history():
         logger.error(f"Failed to save history: {e}")
 
 
+def is_quiet_hours() -> bool:
+    if not quiet_hours_settings["enabled"]:
+        return False
+    
+    now = datetime.now()
+    current_time = now.hour * 60 + now.minute
+    weekday = now.weekday()
+    
+    if weekday < 5:
+        config = quiet_hours_settings["weekday"]
+    else:
+        config = quiet_hours_settings["weekend"]
+    
+    start_h, start_m = map(int, config["start"].split(":"))
+    end_h, end_m = map(int, config["end"].split(":"))
+    start_mins = start_h * 60 + start_m
+    end_mins = end_h * 60 + end_m
+    
+    if start_mins > end_mins:
+        return current_time >= start_mins or current_time < end_mins
+    else:
+        return start_mins <= current_time < end_mins
+
+
 def reschedule_fetch_job(interval_seconds: int):
     """Reschedule the gold price fetch job with new interval"""
     try:
@@ -96,6 +126,10 @@ def reschedule_fetch_job(interval_seconds: int):
 
 def fetch_gold_prices_job():
     global current_price, adaptive_settings, gold_source_settings
+    
+    if is_quiet_hours():
+        logger.info("Quiet hours - skipping fetch")
+        return
     
     logger.info("Fetching gold prices...")
     result = fetch_gold_prices(gold_source_settings["mode"])
@@ -417,7 +451,9 @@ def get_settings():
                 "unchanged_count": adaptive_settings["unchanged_count"],
                 "wp_api_enabled": wp_api_settings["enabled"],
                 "gold_source_mode": gold_source_settings["mode"],
-                "gold_source_last_used": gold_source_settings["last_source_used"]
+                "gold_source_last_used": gold_source_settings["last_source_used"],
+                "quiet_hours": quiet_hours_settings,
+                "is_quiet_hours_now": is_quiet_hours()
             }
         })
 
