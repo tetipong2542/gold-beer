@@ -1,7 +1,6 @@
 """
 Gold Price Scraper using GoldTraders API
-No Cloudflare bypass needed - direct API access
-With auto-fallback to scraper.py when API data is stale
+With auto-fallback to classic.goldtraders.or.th when API data is stale
 """
 import requests
 from datetime import datetime, timedelta
@@ -11,13 +10,13 @@ import re
 logger = logging.getLogger(__name__)
 
 GOLD_API_URL = "https://static-gold.tothanate.workers.dev/api/gold"
-GOLD_SCRAPE_URL = "https://xn--42cah7d0cxcvbbb9x.com/"
+GOLD_SCRAPE_URL = "https://classic.goldtraders.or.th/"
 
 SOURCE_API = "api"
 SOURCE_SCRAPER = "scraper"
 SOURCE_AUTO = "auto"
 
-STALE_THRESHOLD_MINUTES = 30  # If data older than this, fallback to scraper
+STALE_THRESHOLD_MINUTES = 30
 
 
 def scrape_gold_prices_api() -> dict:
@@ -122,10 +121,9 @@ def is_data_stale(update_time_str: str) -> bool:
 
 
 def fetch_from_scraper() -> dict:
-    """Fetch gold prices using Playwright scraper (fallback)"""
     try:
-        from scraper import scrape_gold_prices
-        logger.info("Falling back to Playwright scraper...")
+        from scraper_goldtraders import scrape_gold_prices
+        logger.info("Fetching from classic.goldtraders.or.th...")
         result = scrape_gold_prices()
         if result.get("success"):
             result["source"] = GOLD_SCRAPE_URL
