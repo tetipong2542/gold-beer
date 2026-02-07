@@ -864,11 +864,17 @@
                     <div class="quiet-hours-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 16px;">
                         <!-- Weekday Group -->
                         <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 16px;">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--gold);">
-                                <i data-lucide="briefcase" style="width: 16px; height: 16px;"></i>
-                                <strong>วันจันทร์ - ศุกร์</strong>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                                <div style="display: flex; align-items: center; gap: 8px; color: var(--gold);">
+                                    <i data-lucide="briefcase" style="width: 16px; height: 16px;"></i>
+                                    <strong>วันจันทร์ - ศุกร์</strong>
+                                </div>
+                                <label class="toggle-switch" style="transform: scale(0.8);">
+                                    <input type="checkbox" id="weekdayEnabled" checked onchange="saveQuietHours()">
+                                    <span class="slider"></span>
+                                </label>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <div id="weekdayInputs" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                                 <div class="form-group">
                                     <label>เริ่ม</label>
                                     <input type="time" id="weekdayStart" value="18:00" style="width: 110px;">
@@ -883,11 +889,17 @@
 
                         <!-- Weekend Group -->
                         <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 16px;">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--gold);">
-                                <i data-lucide="coffee" style="width: 16px; height: 16px;"></i>
-                                <strong>วันเสาร์ - อาทิตย์</strong>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                                <div style="display: flex; align-items: center; gap: 8px; color: var(--gold);">
+                                    <i data-lucide="coffee" style="width: 16px; height: 16px;"></i>
+                                    <strong>วันเสาร์ - อาทิตย์</strong>
+                                </div>
+                                <label class="toggle-switch" style="transform: scale(0.8);">
+                                    <input type="checkbox" id="weekendEnabled" checked onchange="saveQuietHours()">
+                                    <span class="slider"></span>
+                                </label>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <div id="weekendInputs" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                                 <div class="form-group">
                                     <label>เริ่ม</label>
                                     <input type="time" id="weekendStart" value="18:00" style="width: 110px;">
@@ -1356,19 +1368,22 @@ if ($gold['success']) {
                         if (data.settings.quiet_hours) {
                             const qh = data.settings.quiet_hours;
                             document.getElementById('quietHoursToggle').checked = qh.enabled;
+                            document.getElementById('weekdayEnabled').checked = qh.weekday?.enabled !== false;
                             document.getElementById('weekdayStart').value = qh.weekday?.start || '18:00';
                             document.getElementById('weekdayEnd').value = qh.weekday?.end || '08:00';
+                            document.getElementById('weekendEnabled').checked = qh.weekend?.enabled !== false;
                             document.getElementById('weekendStart').value = qh.weekend?.start || '18:00';
                             document.getElementById('weekendEnd').value = qh.weekend?.end || '08:00';
                             
-                            updateQuietHoursUI(qh.enabled, data.settings.is_quiet_hours_now);
+                            updateQuietHoursUI(qh, data.settings.is_quiet_hours_now);
                         }
                     }
                 })
                 .catch(e => console.error('Failed to load WP API settings:', e));
         }
 
-        function updateQuietHoursUI(enabled, isQuietNow) {
+        function updateQuietHoursUI(qh, isQuietNow) {
+            const enabled = qh.enabled;
             const toggle = document.getElementById('quietHoursToggle');
             const content = document.getElementById('quietHoursContent');
             const badge = document.getElementById('quietHoursStatusBadge');
@@ -1386,6 +1401,14 @@ if ($gold['success']) {
                 badge.textContent = 'ปิด';
                 badge.style.background = 'var(--red)';
             }
+
+            const weekdayEnabled = qh.weekday?.enabled !== false;
+            const weekendEnabled = qh.weekend?.enabled !== false;
+            
+            document.getElementById('weekdayEnabled').checked = weekdayEnabled;
+            document.getElementById('weekendEnabled').checked = weekendEnabled;
+            document.getElementById('weekdayInputs').style.opacity = weekdayEnabled ? '1' : '0.5';
+            document.getElementById('weekendInputs').style.opacity = weekendEnabled ? '1' : '0.5';
 
             if (isQuietNow) {
                 nowStatus.textContent = 'อยู่ในช่วง Quiet Hours (หยุดดึง)';
@@ -1408,7 +1431,7 @@ if ($gold['success']) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    updateQuietHoursUI(enabled, data.settings.is_quiet_hours_now);
+                    updateQuietHoursUI(data.settings.quiet_hours, data.settings.is_quiet_hours_now);
                     showToast(enabled ? 'Quiet Hours เปิดใช้งาน' : 'Quiet Hours ปิดใช้งาน');
                 } else {
                     showToast(data.error || 'เกิดข้อผิดพลาด', true);
@@ -1420,10 +1443,12 @@ if ($gold['success']) {
 
         async function saveQuietHours() {
             const weekday = {
+                enabled: document.getElementById('weekdayEnabled').checked,
                 start: document.getElementById('weekdayStart').value,
                 end: document.getElementById('weekdayEnd').value
             };
             const weekend = {
+                enabled: document.getElementById('weekendEnabled').checked,
                 start: document.getElementById('weekendStart').value,
                 end: document.getElementById('weekendEnd').value
             };
@@ -1436,7 +1461,7 @@ if ($gold['success']) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    updateQuietHoursUI(data.settings.quiet_hours.enabled, data.settings.is_quiet_hours_now);
+                    updateQuietHoursUI(data.settings.quiet_hours, data.settings.is_quiet_hours_now);
                     showToast('บันทึกเวลา Quiet Hours สำเร็จ!');
                 } else {
                     showToast(data.error || 'เกิดข้อผิดพลาด', true);

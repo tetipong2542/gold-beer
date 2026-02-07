@@ -61,8 +61,8 @@ gold_source_settings = {
 
 quiet_hours_settings = {
     "enabled": True,
-    "weekday": {"start": "18:00", "end": "08:00"},
-    "weekend": {"start": "18:00", "end": "08:00"},
+    "weekday": {"enabled": True, "start": "18:00", "end": "08:00"},
+    "weekend": {"enabled": True, "start": "18:00", "end": "08:00"},
 }
 
 
@@ -101,6 +101,9 @@ def is_quiet_hours() -> bool:
         config = quiet_hours_settings["weekday"]
     else:
         config = quiet_hours_settings["weekend"]
+    
+    if not config.get("enabled", True):
+        return False
     
     start_h, start_m = map(int, config["start"].split(":"))
     end_h, end_m = map(int, config["end"].split(":"))
