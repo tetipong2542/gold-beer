@@ -4,7 +4,7 @@ Provides REST API endpoints for Thai gold prices with auto-refresh every 1 minut
 """
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import deque
 from threading import Lock
 from flask import Flask, jsonify, request, render_template
@@ -15,6 +15,8 @@ from scraper_api import fetch_gold_prices, SOURCE_API, SOURCE_SCRAPER, SOURCE_AU
 import logging
 import atexit
 import sys
+
+THAI_TZ = timezone(timedelta(hours=7))
 
 # Configure logging
 logging.basicConfig(
@@ -93,7 +95,7 @@ def is_quiet_hours() -> bool:
     if not quiet_hours_settings["enabled"]:
         return False
     
-    now = datetime.now()
+    now = datetime.now(THAI_TZ)
     current_time = now.hour * 60 + now.minute
     weekday = now.weekday()
     
@@ -187,7 +189,7 @@ def fetch_gold_prices_job():
 def adjust_refresh_interval():
     global adaptive_settings
 
-    now = datetime.now()
+    now = datetime.now(THAI_TZ)
     hour = now.hour
     weekday = now.weekday()
     
