@@ -11,7 +11,7 @@ from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from scraper_api import scrape_gold_prices_api  # Use API instead of scraping
+from scraper_api import fetch_gold_prices, SOURCE_API, SOURCE_SCRAPER, SOURCE_AUTO
 import logging
 import atexit
 import sys
@@ -23,6 +23,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Suppress noisy loggers to reduce log volume
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+logging.getLogger('apscheduler').setLevel(logging.WARNING)
+logging.getLogger('apscheduler.executors.default').setLevel(logging.WARNING)
+logging.getLogger('apscheduler.scheduler').setLevel(logging.WARNING)
+
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
@@ -33,7 +39,6 @@ current_price = {}
 price_history = deque(maxlen=1440)  # Store 24 hours of data (1 per minute)
 
 # Configuration
-FETCH_INTERVAL_MINUTES = 1
 HISTORY_FILE = "gold_price_history.json"
 
 adaptive_settings = {
@@ -46,7 +51,12 @@ adaptive_settings = {
 
 # WordPress API settings
 wp_api_settings = {
-    "enabled": True,  # Enable/disable WP API access
+    "enabled": True,
+}
+
+gold_source_settings = {
+    "mode": SOURCE_AUTO,
+    "last_source_used": None,
 }
 
 
@@ -73,11 +83,22 @@ def save_history():
         logger.error(f"Failed to save history: {e}")
 
 
-def fetch_gold_prices():
-    global current_price, adaptive_settings
+def reschedule_fetch_job(interval_seconds: int):
+    """Reschedule the gold price fetch job with new interval"""
+    try:
+        scheduler.reschedule_job(
+            'gold_price_fetch',
+            trigger=IntervalTrigger(seconds=interval_seconds)
+        )
+    except Exception as e:
+        logger.error(f"Failed to reschedule job: {e}")
+
+
+def fetch_gold_prices_job():
+    global current_price, adaptive_settings, gold_source_settings
     
-    logger.info("Fetching gold prices from API...")
-    result = scrape_gold_prices_api()
+    logger.info("Fetching gold prices...")
+    result = fetch_gold_prices(gold_source_settings["mode"])
     
     with data_lock:
         if result.get("success"):
@@ -102,14 +123,18 @@ def fetch_gold_prices():
                     "change_count": new_change_count
                 }
                 price_history.append(history_entry)
-                logger.info(f"📈 Price changed! Bar: {result['gold_bar']['sell']}, Count: {new_change_count}")
+                logger.info(f"Price changed! Bar: {result['gold_bar']['sell']}, Count: {new_change_count}")
             else:
                 # Price unchanged - increment counter
                 adaptive_settings["unchanged_count"] += 1
-                logger.info(f"⏸️ Price unchanged (x{adaptive_settings['unchanged_count']})")
+                # Log only at milestones: 1, 10, 50, 100, then every 100
+                count = adaptive_settings["unchanged_count"]
+                if count in [1, 10, 50, 100] or count % 100 == 0:
+                    logger.info(f"Price unchanged (x{count})")
             
             # Always update current_price for display
             current_price = result
+            gold_source_settings["last_source_used"] = result.get("source_type", "unknown")
             
             # Adaptive interval adjustment
             if adaptive_settings["adaptive_enabled"]:
@@ -151,16 +176,17 @@ def adjust_refresh_interval():
     
     if new_interval != adaptive_settings["current_interval"]:
         adaptive_settings["current_interval"] = new_interval
-        logger.info(f"🔄 Adaptive interval: {new_interval}s (unchanged: {unchanged}, off_hours: {is_off_hours})")
+        reschedule_fetch_job(new_interval)
+        logger.info(f"Adaptive interval: {new_interval}s (unchanged: {unchanged}, off_hours: {is_off_hours})")
 
 
 # Initialize scheduler
 scheduler = BackgroundScheduler()
 scheduler.add_job(
-    func=fetch_gold_prices,
-    trigger=IntervalTrigger(minutes=FETCH_INTERVAL_MINUTES),
+    func=fetch_gold_prices_job,
+    trigger=IntervalTrigger(seconds=adaptive_settings["base_interval"]),
     id='gold_price_fetch',
-    name='Fetch gold prices every minute',
+    name='Fetch gold prices',
     replace_existing=True
 )
 
@@ -175,16 +201,16 @@ def init_app():
     # Start scheduler if not already running
     if not scheduler.running:
         scheduler.start()
-        logger.info(f"⏰ Scheduler started - fetching every {FETCH_INTERVAL_MINUTES} minute(s)")
+        logger.info(f"Scheduler started - initial interval: {adaptive_settings['base_interval']}s")
     
     # Fetch initial data IMMEDIATELY if no data available
     with data_lock:
         need_fetch = not current_price
     
     if need_fetch:
-        logger.info("📥 Fetching initial gold prices...")
-        fetch_gold_prices()
-        logger.info("✅ Initial gold prices loaded!")
+        logger.info("Fetching initial gold prices...")
+        fetch_gold_prices_job()
+        logger.info("Initial gold prices loaded")
 
 
 # Initialize on module load (works with both flask run and python app.py)
@@ -327,7 +353,7 @@ def refresh_prices():
             except (ValueError, TypeError):
                 pass
     
-    fetch_gold_prices()
+    fetch_gold_prices_job()
     with data_lock:
         return jsonify({
             "success": True,
@@ -387,7 +413,6 @@ def get_summary():
 
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
-    """Get current adaptive refresh settings"""
     with data_lock:
         return jsonify({
             "success": True,
@@ -396,35 +421,44 @@ def get_settings():
                 "base_interval": adaptive_settings["base_interval"],
                 "current_interval": adaptive_settings["current_interval"],
                 "unchanged_count": adaptive_settings["unchanged_count"],
-                "wp_api_enabled": wp_api_settings["enabled"]
+                "wp_api_enabled": wp_api_settings["enabled"],
+                "gold_source_mode": gold_source_settings["mode"],
+                "gold_source_last_used": gold_source_settings["last_source_used"]
             }
         })
 
 
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
-    """Update adaptive refresh settings"""
-    global adaptive_settings, wp_api_settings
+    global adaptive_settings, wp_api_settings, gold_source_settings
     
     data = request.get_json() or {}
     
     with data_lock:
         if "adaptive_enabled" in data:
             adaptive_settings["adaptive_enabled"] = bool(data["adaptive_enabled"])
-            logger.info(f"🔧 Adaptive mode: {'enabled' if adaptive_settings['adaptive_enabled'] else 'disabled'}")
+            logger.info(f"Adaptive mode: {'enabled' if adaptive_settings['adaptive_enabled'] else 'disabled'}")
         
         if "base_interval" in data:
             interval = int(data["base_interval"])
             if 60 <= interval <= 600:
                 adaptive_settings["base_interval"] = interval
                 adaptive_settings["current_interval"] = interval
-                logger.info(f"🔧 Base interval: {interval}s")
+                logger.info(f"Base interval: {interval}s")
             else:
                 return jsonify({"success": False, "error": "Interval must be 60-600 seconds"}), 400
         
         if "wp_api_enabled" in data:
             wp_api_settings["enabled"] = bool(data["wp_api_enabled"])
-            logger.info(f"🔧 WP API: {'enabled' if wp_api_settings['enabled'] else 'disabled'}")
+            logger.info(f"WP API: {'enabled' if wp_api_settings['enabled'] else 'disabled'}")
+        
+        if "gold_source_mode" in data:
+            mode = data["gold_source_mode"]
+            if mode in [SOURCE_API, SOURCE_SCRAPER, SOURCE_AUTO]:
+                gold_source_settings["mode"] = mode
+                logger.info(f"Gold source mode: {mode}")
+            else:
+                return jsonify({"success": False, "error": "Invalid source mode"}), 400
         
         return jsonify({
             "success": True,
@@ -433,7 +467,9 @@ def update_settings():
                 "adaptive_enabled": adaptive_settings["adaptive_enabled"],
                 "base_interval": adaptive_settings["base_interval"],
                 "current_interval": adaptive_settings["current_interval"],
-                "wp_api_enabled": wp_api_settings["enabled"]
+                "wp_api_enabled": wp_api_settings["enabled"],
+                "gold_source_mode": gold_source_settings["mode"],
+                "gold_source_last_used": gold_source_settings["last_source_used"]
             }
         })
 
