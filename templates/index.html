@@ -843,6 +843,85 @@
                 </div>
             </div>
 
+            <!-- Quiet Hours Control -->
+            <div class="toggle-section">
+                <div class="toggle-header">
+                    <div class="toggle-title">
+                        <i data-lucide="moon" style="width: 20px; height: 20px; color: var(--purple);"></i>
+                        ช่วงเวลาหยุดดึงข้อมูล (Quiet Hours)
+                        <span class="badge" id="quietHoursStatusBadge" style="background: var(--green);">เปิด</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="quietHoursToggle" checked onchange="toggleQuietHours()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <p class="toggle-desc">
+                    หยุดดึงข้อมูลอัตโนมัติในช่วงเวลาที่กำหนด (ตลาดทองปิดทำการ)
+                </p>
+
+                <div class="toggle-content" id="quietHoursContent">
+                    <div class="quiet-hours-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 16px;">
+                        <!-- Weekday Group -->
+                        <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 16px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--gold);">
+                                <i data-lucide="briefcase" style="width: 16px; height: 16px;"></i>
+                                <strong>วันจันทร์ - ศุกร์</strong>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <div class="form-group">
+                                    <label>เริ่ม</label>
+                                    <input type="time" id="weekdayStart" value="18:00" style="width: 110px;">
+                                </div>
+                                <span style="color: #888;">ถึง</span>
+                                <div class="form-group">
+                                    <label>สิ้นสุด</label>
+                                    <input type="time" id="weekdayEnd" value="08:00" style="width: 110px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Weekend Group -->
+                        <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 16px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--gold);">
+                                <i data-lucide="coffee" style="width: 16px; height: 16px;"></i>
+                                <strong>วันเสาร์ - อาทิตย์</strong>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <div class="form-group">
+                                    <label>เริ่ม</label>
+                                    <input type="time" id="weekendStart" value="18:00" style="width: 110px;">
+                                </div>
+                                <span style="color: #888;">ถึง</span>
+                                <div class="form-group">
+                                    <label>สิ้นสุด</label>
+                                    <input type="time" id="weekendEnd" value="08:00" style="width: 110px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                        <button class="save-btn" onclick="saveQuietHours()">
+                            <i data-lucide="save" style="width: 16px; height: 16px;"></i>
+                            บันทึกเวลา
+                        </button>
+                        <div class="status-item" id="quietHoursNowStatus" style="background: rgba(139, 92, 246, 0.2); color: var(--purple);">
+                            <i data-lucide="clock" style="width: 14px; height: 14px;"></i>
+                            สถานะ: <span id="quietHoursNow">กำลังตรวจสอบ...</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-info" style="margin-top: 16px;">
+                        <i data-lucide="info" style="width: 18px; height: 18px;"></i>
+                        <div>
+                            <strong>หมายเหตุ:</strong> ตลาดทองไทยเปิดทำการ 09:00-17:00 น. (จ-ศ) 
+                            การตั้งค่า 18:00-08:00 จะหยุดดึงข้อมูลนอกเวลาทำการ ประหยัด resources
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="settings-info settings-warning">
                 <i data-lucide="alert-triangle" style="width: 18px; height: 18px;"></i>
                 <div><strong>ข้อมูลดี:</strong> API ไม่มี rate limit แต่ราคาอัพเดทเฉลี่ย 12-15 นาที/ครั้ง ไม่จำเป็นต้องรีเฟรชบ่อยเกินไป</div>
@@ -1272,9 +1351,99 @@ if ($gold['success']) {
                             status.textContent = 'ปิดใช้งาน';
                             status.style.color = 'var(--red)';
                         }
+
+                        // Load quiet hours settings
+                        if (data.settings.quiet_hours) {
+                            const qh = data.settings.quiet_hours;
+                            document.getElementById('quietHoursToggle').checked = qh.enabled;
+                            document.getElementById('weekdayStart').value = qh.weekday?.start || '18:00';
+                            document.getElementById('weekdayEnd').value = qh.weekday?.end || '08:00';
+                            document.getElementById('weekendStart').value = qh.weekend?.start || '18:00';
+                            document.getElementById('weekendEnd').value = qh.weekend?.end || '08:00';
+                            
+                            updateQuietHoursUI(qh.enabled, data.settings.is_quiet_hours_now);
+                        }
                     }
                 })
                 .catch(e => console.error('Failed to load WP API settings:', e));
+        }
+
+        function updateQuietHoursUI(enabled, isQuietNow) {
+            const toggle = document.getElementById('quietHoursToggle');
+            const content = document.getElementById('quietHoursContent');
+            const badge = document.getElementById('quietHoursStatusBadge');
+            const nowStatus = document.getElementById('quietHoursNow');
+            const nowContainer = document.getElementById('quietHoursNowStatus');
+
+            toggle.checked = enabled;
+            
+            if (enabled) {
+                content.classList.remove('hidden');
+                badge.textContent = 'เปิด';
+                badge.style.background = 'var(--green)';
+            } else {
+                content.classList.add('hidden');
+                badge.textContent = 'ปิด';
+                badge.style.background = 'var(--red)';
+            }
+
+            if (isQuietNow) {
+                nowStatus.textContent = 'อยู่ในช่วง Quiet Hours (หยุดดึง)';
+                nowContainer.style.background = 'rgba(239, 68, 68, 0.2)';
+                nowContainer.style.color = 'var(--red)';
+            } else {
+                nowStatus.textContent = 'กำลังดึงข้อมูลปกติ';
+                nowContainer.style.background = 'rgba(34, 197, 94, 0.2)';
+                nowContainer.style.color = 'var(--green)';
+            }
+        }
+
+        async function toggleQuietHours() {
+            const enabled = document.getElementById('quietHoursToggle').checked;
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ quiet_hours: { enabled } })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    updateQuietHoursUI(enabled, data.settings.is_quiet_hours_now);
+                    showToast(enabled ? 'Quiet Hours เปิดใช้งาน' : 'Quiet Hours ปิดใช้งาน');
+                } else {
+                    showToast(data.error || 'เกิดข้อผิดพลาด', true);
+                }
+            } catch (e) {
+                showToast('เกิดข้อผิดพลาด', true);
+            }
+        }
+
+        async function saveQuietHours() {
+            const weekday = {
+                start: document.getElementById('weekdayStart').value,
+                end: document.getElementById('weekdayEnd').value
+            };
+            const weekend = {
+                start: document.getElementById('weekendStart').value,
+                end: document.getElementById('weekendEnd').value
+            };
+
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ quiet_hours: { weekday, weekend } })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    updateQuietHoursUI(data.settings.quiet_hours.enabled, data.settings.is_quiet_hours_now);
+                    showToast('บันทึกเวลา Quiet Hours สำเร็จ!');
+                } else {
+                    showToast(data.error || 'เกิดข้อผิดพลาด', true);
+                }
+            } catch (e) {
+                showToast('เกิดข้อผิดพลาด', true);
+            }
         }
 
         // Init

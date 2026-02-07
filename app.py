@@ -490,6 +490,16 @@ def update_settings():
             else:
                 return jsonify({"success": False, "error": "Invalid source mode"}), 400
         
+        if "quiet_hours" in data:
+            qh = data["quiet_hours"]
+            if "enabled" in qh:
+                quiet_hours_settings["enabled"] = bool(qh["enabled"])
+            if "weekday" in qh:
+                quiet_hours_settings["weekday"] = qh["weekday"]
+            if "weekend" in qh:
+                quiet_hours_settings["weekend"] = qh["weekend"]
+            logger.info(f"Quiet hours: enabled={quiet_hours_settings['enabled']}, weekday={quiet_hours_settings['weekday']}, weekend={quiet_hours_settings['weekend']}")
+        
         return jsonify({
             "success": True,
             "message": "Settings updated",
@@ -499,7 +509,9 @@ def update_settings():
                 "current_interval": adaptive_settings["current_interval"],
                 "wp_api_enabled": wp_api_settings["enabled"],
                 "gold_source_mode": gold_source_settings["mode"],
-                "gold_source_last_used": gold_source_settings["last_source_used"]
+                "gold_source_last_used": gold_source_settings["last_source_used"],
+                "quiet_hours": quiet_hours_settings,
+                "is_quiet_hours_now": is_quiet_hours()
             }
         })
 
