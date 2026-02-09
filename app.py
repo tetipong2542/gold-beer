@@ -119,7 +119,6 @@ def is_quiet_hours() -> bool:
 
 
 def reschedule_fetch_job(interval_seconds: int):
-    """Reschedule the gold price fetch job with new interval"""
     try:
         scheduler.reschedule_job(
             'gold_price_fetch',
@@ -127,6 +126,45 @@ def reschedule_fetch_job(interval_seconds: int):
         )
     except Exception as e:
         logger.error(f"Failed to reschedule job: {e}")
+
+
+def calculate_price_changes(new_bar_sell: float) -> dict:
+    """Calculate price_change (vs last) and today_change (vs first today) from history"""
+    result = {
+        "price_change": {"amount": 0, "direction": "unchanged"},
+        "today_change": {"amount": 0, "direction": "unchanged"}
+    }
+    
+    if not price_history or new_bar_sell is None:
+        return result
+    
+    history_list = list(price_history)
+    
+    if history_list:
+        last_entry = history_list[-1]
+        last_sell = last_entry.get("gold_bar", {}).get("sell")
+        if last_sell and last_sell != new_bar_sell:
+            diff = new_bar_sell - last_sell
+            result["price_change"] = {
+                "amount": abs(diff),
+                "direction": "up" if diff > 0 else "down"
+            }
+    
+    today = datetime.now(THAI_TZ).strftime('%Y-%m-%d')
+    today_entries = [h for h in history_list if h.get('timestamp', '').startswith(today)]
+    
+    if today_entries:
+        first_today = today_entries[0]
+        first_sell = first_today.get("gold_bar", {}).get("sell")
+        if first_sell:
+            total_diff = new_bar_sell - first_sell
+            if total_diff != 0:
+                result["today_change"] = {
+                    "amount": abs(total_diff),
+                    "direction": "up" if total_diff > 0 else "down"
+                }
+    
+    return result
 
 
 def fetch_gold_prices_job():
@@ -143,16 +181,18 @@ def fetch_gold_prices_job():
         if result.get("success"):
             new_change_count = result.get("change_count")
             last_change_count = adaptive_settings["last_change_count"]
+            new_bar_sell = result.get("gold_bar", {}).get("sell")
             
-            # Check if price actually changed (compare change_count from source)
             price_changed = (last_change_count is None or new_change_count != last_change_count)
             
+            calculated_changes = calculate_price_changes(new_bar_sell)
+            result["price_change"] = calculated_changes["price_change"]
+            result["today_change"] = calculated_changes["today_change"]
+            
             if price_changed:
-                # Price changed - reset unchanged counter
                 adaptive_settings["unchanged_count"] = 0
                 adaptive_settings["last_change_count"] = new_change_count
                 
-                # Add to history only when price changes
                 history_entry = {
                     "timestamp": result["timestamp"],
                     "gold_bar": result["gold_bar"],
@@ -164,24 +204,19 @@ def fetch_gold_prices_job():
                 price_history.append(history_entry)
                 logger.info(f"Price changed! Bar: {result['gold_bar']['sell']}, Count: {new_change_count}")
             else:
-                # Price unchanged - increment counter
                 adaptive_settings["unchanged_count"] += 1
-                # Log only at milestones: 1, 10, 50, 100, then every 100
                 count = adaptive_settings["unchanged_count"]
                 if count in [1, 10, 50, 100] or count % 100 == 0:
                     logger.info(f"Price unchanged (x{count})")
             
-            # Always update current_price for display
             current_price = result
             gold_source_settings["last_source_used"] = result.get("source_type", "unknown")
             
-            # Adaptive interval adjustment
             if adaptive_settings["adaptive_enabled"]:
                 adjust_refresh_interval()
         else:
             logger.warning(f"Failed to fetch prices: {result.get('error')}")
     
-    # Save history periodically (every 10 changes)
     if len(price_history) % 10 == 0:
         save_history()
 
