@@ -1,6 +1,6 @@
 """
 Gold Price Scraper using GoldTraders API
-With auto-fallback to aurora.co.th when API data is stale
+With auto-fallback to classic.goldtraders.or.th when API data is stale
 """
 import requests
 from datetime import datetime, timedelta
@@ -10,7 +10,7 @@ import re
 logger = logging.getLogger(__name__)
 
 GOLD_API_URL = "https://static-gold.tothanate.workers.dev/api/gold"
-GOLD_SCRAPE_URL = "https://www.aurora.co.th/price/gold_pricelist"
+GOLD_SCRAPE_URL = "https://classic.goldtraders.or.th/"
 
 SOURCE_API = "api"
 SOURCE_SCRAPER = "scraper"
@@ -122,8 +122,8 @@ def is_data_stale(update_time_str: str) -> bool:
 
 def fetch_from_scraper() -> dict:
     try:
-        from scraper_aurora import scrape_gold_prices
-        logger.info("Fetching from aurora.co.th...")
+        from scraper_goldtraders import scrape_gold_prices
+        logger.info("Fetching from classic.goldtraders.or.th...")
         result = scrape_gold_prices()
         if result.get("success"):
             result["source"] = GOLD_SCRAPE_URL
