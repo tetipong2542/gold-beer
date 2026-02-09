@@ -128,6 +128,47 @@ def reschedule_fetch_job(interval_seconds: int):
         logger.error(f"Failed to reschedule job: {e}")
 
 
+def calculate_price_changes(new_bar_sell: float) -> dict:
+    """Calculate price_change (vs last) and today_change (vs first today) from history"""
+    result = {
+        "price_change": {"amount": 0, "direction": "unchanged"},
+        "today_change": {"amount": 0, "direction": "unchanged"}
+    }
+    
+    if not price_history or new_bar_sell is None:
+        return result
+    
+    history_list = list(price_history)
+    
+    # price_change: compare with last entry
+    if history_list:
+        last_entry = history_list[-1]
+        last_sell = last_entry.get("gold_bar", {}).get("sell")
+        if last_sell and last_sell != new_bar_sell:
+            diff = new_bar_sell - last_sell
+            result["price_change"] = {
+                "amount": abs(diff),
+                "direction": "up" if diff > 0 else "down"
+            }
+    
+    # today_change: compare with first entry of today
+    today = datetime.now(THAI_TZ).strftime('%Y-%m-%d')
+    today_entries = [h for h in history_list if h.get('timestamp', '').startswith(today)]
+    
+    if today_entries:
+        first_today = today_entries[0]
+        first_sell = first_today.get("gold_bar", {}).get("sell")
+        if first_sell:
+            total_diff = new_bar_sell - first_sell
+            if total_diff != 0:
+                result["today_change"] = {
+                    "amount": abs(total_diff),
+                    "direction": "up" if total_diff > 0 else "down"
+                }
+    
+    return result
+
+
 def fetch_gold_prices_job():
     global current_price, adaptive_settings, gold_source_settings
     
@@ -140,6 +181,11 @@ def fetch_gold_prices_job():
     
     with data_lock:
         if result.get("success"):
+            new_bar_sell = result.get("gold_bar", {}).get("sell")
+            calculated_changes = calculate_price_changes(new_bar_sell)
+            result["price_change"] = calculated_changes["price_change"]
+            result["today_change"] = calculated_changes["today_change"]
+            
             new_change_count = result.get("change_count")
             last_change_count = adaptive_settings["last_change_count"]
             
