@@ -169,10 +169,10 @@ def calculate_price_changes(new_bar_sell: float) -> dict:
     return result
 
 
-def fetch_gold_prices_job():
+def fetch_gold_prices_job(force=False):
     global current_price, adaptive_settings, gold_source_settings
     
-    if is_quiet_hours():
+    if not force and is_quiet_hours():
         logger.info("Quiet hours - skipping fetch")
         return
     
@@ -284,7 +284,7 @@ def init_app():
     
     if need_fetch:
         logger.info("Fetching initial gold prices...")
-        fetch_gold_prices_job()
+        fetch_gold_prices_job(force=True)
         logger.info("Initial gold prices loaded")
 
 
