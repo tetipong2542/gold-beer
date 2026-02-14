@@ -1,6 +1,7 @@
 """
-Gold Price Scraper using GoldTraders API
+Gold Price Scraper using RakaTong.com API
 With auto-fallback to classic.goldtraders.or.th when API data is stale
+Source: https://rakatong.com/api/homepage.php
 """
 import requests
 from datetime import datetime, timedelta
@@ -9,7 +10,7 @@ import re
 
 logger = logging.getLogger(__name__)
 
-GOLD_API_URL = "https://static-gold.tothanate.workers.dev/api/gold"
+GOLD_API_URL = "https://rakatong.com/api/homepage.php"
 GOLD_SCRAPE_URL = "https://classic.goldtraders.or.th/"
 
 SOURCE_API = "api"
@@ -19,9 +20,30 @@ SOURCE_AUTO = "auto"
 STALE_THRESHOLD_MINUTES = 30
 
 
+def _parse_price(value: str) -> float:
+    """Parse price string like '72,400.00' to float 72400.00"""
+    if not value:
+        return 0.0
+    return float(str(value).replace(",", ""))
+
+
 def scrape_gold_prices_api() -> dict:
     """
-    Scrape gold prices from GoldTraders API
+    Scrape gold prices from RakaTong.com API (homepage.php)
+    
+    API Response format:
+    {
+      "success": true,
+      "data": {
+        "current": {
+          "date": "06/02/2569", "time": "09:43", "annouce": "4",
+          "barBuy": "72,400.00", "barSell": "72,600.00",
+          "ornamentBuy": "70,948.80", "ornamentSell": "73,400.00",
+          "barChange": "100", "barChangeToday": "600"
+        },
+        "today": [...], "statistic": {...}, "last30Days": {...}
+      }
+    }
     
     Returns:
         dict: Contains gold_bar, gold_ornament prices with metadata
@@ -43,57 +65,59 @@ def scrape_gold_prices_api() -> dict:
     try:
         response = requests.get(GOLD_API_URL, timeout=10)
         response.raise_for_status()
-        data = response.json()
+        api_data = response.json()
         
-        # Extract current prices
-        current = data.get("current_prices", {})
-        gold_bar = current.get("gold_bar", {})
-        gold_ornament = current.get("gold_ornament", {})
+        if not api_data.get("success"):
+            result["error"] = "RakaTong API returned success=false"
+            return result
+        
+        data = api_data.get("data", {})
+        current = data.get("current", {})
         
         result["gold_bar"] = {
-            "buy": float(gold_bar.get("buy", 0)),
-            "sell": float(gold_bar.get("sell", 0))
+            "buy": _parse_price(current.get("barBuy")),
+            "sell": _parse_price(current.get("barSell"))
         }
         
         result["gold_ornament"] = {
-            "buy": float(gold_ornament.get("buy", 0)),
-            "sell": float(gold_ornament.get("sell", 0))
+            "buy": _parse_price(current.get("ornamentBuy")),
+            "sell": _parse_price(current.get("ornamentSell"))
         }
         
-        # Price change
-        change_amount = abs(gold_bar.get("change", 0))
-        change_direction = "down" if gold_bar.get("change", 0) < 0 else "up" if gold_bar.get("change", 0) > 0 else "unchanged"
+        bar_change_str = str(current.get("barChange", "0")).replace(",", "")
+        bar_change = float(bar_change_str) if bar_change_str else 0
+        change_direction = "down" if bar_change < 0 else "up" if bar_change > 0 else "unchanged"
         
         result["price_change"] = {
-            "amount": change_amount,
+            "amount": abs(bar_change),
             "direction": change_direction
         }
         
+        today_change_str = str(current.get("barChangeToday", "0")).replace(",", "")
+        today_change = float(today_change_str) if today_change_str else 0
+        today_direction = "down" if today_change < 0 else "up" if today_change > 0 else "unchanged"
+        
         result["today_change"] = {
-            "amount": change_amount,
-            "direction": change_direction
+            "amount": abs(today_change),
+            "direction": today_direction
         }
         
         # Metadata
-        metadata = data.get("metadata", {})
-        result["update_date"] = metadata.get("publish_date")
-        result["update_time"] = metadata.get("last_updated")
+        result["update_date"] = current.get("date")
+        result["update_time"] = current.get("time")
         
-        # Extract change count from update_info (e.g., "ประกาศวันที่ 03/02/2569 เวลา 10:54 น. (ครั้งที่ 19)")
-        update_info = metadata.get("update_info", "")
-        import re
-        count_match = re.search(r'ครั้งที่\s*(\d+)', update_info)
-        result["change_count"] = int(count_match.group(1)) if count_match else 0
+        annouce = current.get("annouce", "0")
+        result["change_count"] = int(annouce) if str(annouce).isdigit() else 0
         
         result["success"] = True
-        logger.info(f"Successfully fetched from API: Bar={result['gold_bar']}")
+        logger.info(f"Successfully fetched from RakaTong API: Bar={result['gold_bar']}")
         
     except requests.RequestException as e:
         result["error"] = f"API request failed: {str(e)}"
-        logger.error(f"API error: {e}")
+        logger.error(f"RakaTong API error: {e}")
     except Exception as e:
         result["error"] = f"Parsing failed: {str(e)}"
-        logger.error(f"Parsing error: {e}")
+        logger.error(f"RakaTong parsing error: {e}")
     
     return result
 
@@ -142,7 +166,7 @@ def fetch_gold_prices(source_mode: str = SOURCE_AUTO) -> dict:
     Fetch gold prices with configurable source mode.
     
     Args:
-        source_mode: 'api', 'scraper', or 'auto' (fallback if stale)
+        source_mode: 'api', 'scraper', or 'auto' (fallback if stale or failed)
     """
     if source_mode == SOURCE_SCRAPER:
         return fetch_from_scraper()
@@ -150,8 +174,16 @@ def fetch_gold_prices(source_mode: str = SOURCE_AUTO) -> dict:
     result = scrape_gold_prices_api()
     result["source_type"] = SOURCE_API
     
-    if source_mode == SOURCE_AUTO and result.get("success"):
-        if is_data_stale(result.get("update_time") or ""):
+    if source_mode == SOURCE_AUTO:
+        # Fallback to scraper if API failed entirely
+        if not result.get("success"):
+            logger.warning(f"API failed ({result.get('error')}), falling back to scraper...")
+            scraper_result = fetch_from_scraper()
+            if scraper_result.get("success"):
+                return scraper_result
+            logger.warning("Scraper also failed, returning API error")
+        # Fallback to scraper if API data is stale
+        elif is_data_stale(result.get("update_time") or ""):
             logger.warning(f"API data is stale (update_time: {result.get('update_time')}), trying scraper...")
             scraper_result = fetch_from_scraper()
             if scraper_result.get("success"):

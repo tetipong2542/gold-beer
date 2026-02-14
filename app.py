@@ -182,9 +182,14 @@ def fetch_gold_prices_job():
     with data_lock:
         if result.get("success"):
             new_bar_sell = result.get("gold_bar", {}).get("sell")
-            calculated_changes = calculate_price_changes(new_bar_sell)
-            result["price_change"] = calculated_changes["price_change"]
-            result["today_change"] = calculated_changes["today_change"]
+            
+            api_price_change = result.get("price_change", {})
+            api_today_change = result.get("today_change", {})
+            
+            if not api_price_change.get("amount") and not api_today_change.get("amount"):
+                calculated_changes = calculate_price_changes(new_bar_sell)
+                result["price_change"] = calculated_changes["price_change"]
+                result["today_change"] = calculated_changes["today_change"]
             
             new_change_count = result.get("change_count")
             last_change_count = adaptive_settings["last_change_count"]
@@ -295,8 +300,8 @@ def index():
     return jsonify({
         "name": "Thai Gold Price API",
         "version": "2.0.0",
-        "data_source": "GoldTraders.or.th Official API (static-gold.tothanate.workers.dev)",
-        "note": "No Cloudflare bypass needed - direct API access"
+        "data_source": "GoldTraders.or.th via RakaTong.com API (rakatong.com/api/homepage.php)",
+        "note": "No Cloudflare bypass needed - direct API access via RakaTong"
     })
 
 

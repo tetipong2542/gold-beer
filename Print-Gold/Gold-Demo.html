@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ใบเสนอราคา - ห้างทองเยาวราช (ตัวอย่าง)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;700&family=Sarabun:wght@300;400;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            /* Gold Theme Colors */
+            --primary-gold: #c59d5f;
+            --dark-gold: #997b3d;
+            --light-gold: #f9f3e5;
+            --auspicious-red: #a93226;
+            /* สีแดงมงคลสำหรับตัวเลขสำคัญ */
+            --text-dark: #333333;
+            --text-grey: #666666;
+            --border-color: #e0d0b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+            background-color: #f0f0f0;
+            padding: 30px;
+            color: var(--text-dark);
+            -webkit-print-color-adjust: exact;
+        }
+
+        /* Container Style - Represents one A4 Page */
+        .invoice-container {
+            max-width: 210mm;
+            /* A4 Width */
+            min-height: 297mm;
+            /* A4 Height */
+            margin: 0 auto 30px auto;
+            /* Add margin-bottom for screen view separation */
+            background-color: white;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-top: 5px solid var(--primary-gold);
+            border-bottom: 5px solid var(--primary-gold);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Watermark Background */
+        .invoice-container::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 300px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f9f3e5'%3E%3Cpath d='M4 4h16v16H4V4m18-2H2v20h20V2M12 8l-2 4h4l-2-4z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center;
+            opacity: 0.4;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Header Section */
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .shop-branding {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-placeholder {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            background-color: var(--primary-gold);
+        }
+
+        .logo-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .shop-info h1 {
+            color: var(--dark-gold);
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            letter-spacing: 0.5px;
+        }
+
+        .shop-info p {
+            font-size: 12px;
+            color: var(--text-grey);
+            line-height: 1.4;
+        }
+
+        .doc-title {
+            text-align: right;
+        }
+
+        .doc-title h2 {
+            color: var(--auspicious-red);
+            font-size: 28px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .doc-title span {
+            font-size: 12px;
+            color: var(--primary-gold);
+            font-weight: 600;
+            letter-spacing: 2px;
+        }
+
+        /* Info Grid */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .info-box h3 {
+            color: var(--dark-gold);
+            font-size: 14px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .info-row {
+            display: flex;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+
+        .info-label {
+            width: 90px;
+            color: var(--text-grey);
+            font-weight: 600;
+        }
+
+        .info-value {
+            flex: 1;
+            color: var(--text-dark);
+        }
+
+        /* Table */
+        .table-container {
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+            flex-grow: 1;
+            /* No min-height to allow content to dictate space, prevents large gaps */
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background-color: var(--light-gold);
+            color: var(--dark-gold);
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: left;
+            border-top: 1px solid var(--primary-gold);
+            border-bottom: 1px solid var(--primary-gold);
+        }
+
+        td {
+            padding: 10px 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+            vertical-align: top;
+        }
+
+        .col-desc {
+            width: 60%;
+        }
+
+        .col-weight {
+            width: 20%;
+            text-align: center;
+        }
+
+        .col-total {
+            width: 20%;
+            text-align: right;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .item-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 2px;
+        }
+
+        .item-detail {
+            font-size: 11px;
+            color: var(--text-grey);
+        }
+
+        /* Summary Section */
+        .summary-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: auto;
+            /* Push to bottom */
+            padding-top: 20px;
+            position: relative;
+            z-index: 1;
+            page-break-inside: avoid;
+        }
+
+        .remarks {
+            width: 55%;
+            font-size: 11px;
+            color: var(--text-grey);
+            background-color: #fafafa;
+            padding: 12px;
+            border-radius: 4px;
+            border-left: 3px solid var(--primary-gold);
+        }
+
+        .remarks strong {
+            color: var(--dark-gold);
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .remarks ul {
+            padding-left: 15px;
+            margin-top: 5px;
+        }
+
+        .remarks li {
+            margin-bottom: 3px;
+        }
+
+        .totals {
+            width: 40%;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+            color: var(--text-grey);
+        }
+
+        .total-row.grand-total {
+            border-top: 2px solid var(--primary-gold);
+            border-bottom: 2px solid var(--primary-gold);
+            margin-top: 10px;
+            padding: 10px 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--auspicious-red);
+            background-color: var(--light-gold);
+            padding-left: 10px;
+            padding-right: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .baht-text {
+            text-align: right;
+            font-size: 11px;
+            color: var(--text-grey);
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        /* Footer / Signature */
+        .footer-section {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            z-index: 1;
+            page-break-inside: avoid;
+        }
+
+        .signature-box {
+            text-align: center;
+            width: 200px;
+        }
+
+        .signature-line {
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 10px;
+            height: 40px;
+        }
+
+        .signature-text {
+            font-size: 12px;
+            color: var(--text-grey);
+        }
+
+        /* Page Note */
+        .page-note {
+            text-align: right;
+            font-size: 12px;
+            color: #999;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        /* Print Settings */
+        @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+
+            body {
+                background: none;
+                padding: 0;
+                margin: 0;
+            }
+
+            .invoice-container {
+                box-shadow: none;
+                border: none;
+                width: 210mm;
+                min-height: 297mm;
+                padding: 15mm 20mm;
+                margin: 0;
+                page-break-after: always;
+                /* Force new page for each container */
+            }
+
+            .invoice-container:last-child {
+                page-break-after: auto;
+                /* Don't force break after last page */
+            }
+
+            .remarks {
+                background-color: transparent;
+                border: 1px solid #eee;
+                border-left: 3px solid var(--primary-gold);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    
+    <div class="invoice-container">
+
+        
+        <div class="header-section">
+            <div class="shop-branding">
+                <div class="logo-placeholder">
+                    <img src="https://ui-avatars.com/api/?name=Gold&background=c59d5f&color=fff&size=128"
+                        alt="ห้างทองเยาวราช" class="logo-img">
+                </div>
+                <div class="shop-info">
+                    <h1>ห้างทองเยาวราช (สาขาใหญ่)</h1>
+                    <p>
+                        88/8 ถนนเยาวราช แขวงสัมพันธวงศ์ เขตสัมพันธวงศ์ กรุงเทพฯ 10100<br>
+                        โทร: 02-123-4567 | มือถือ: 089-999-8888<br>
+                        LINE: @YaowaratGold | เลขประจำตัวผู้เสียภาษี: 0105558123456
+                    </p>
+                </div>
+            </div>
+            <div class="doc-title">
+                <h2>ใบเสนอราคา</h2>
+                <span>QUOTATION</span>
+            </div>
+        </div>
+
+        
+        <div class="info-grid">
+            <div class="info-box">
+                <h3>ลูกค้า (Customer)</h3>
+                <div class="info-row">
+                    <div class="info-label">ชื่อลูกค้า:</div>
+                    <div class="info-value">คุณสมหญิง รักดี</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">ที่อยู่:</div>
+                    <div class="info-value">123/4 หมู่บ้านเศรษฐี ถ.สุขุมวิท เขตวัฒนา กทม.</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">โทรศัพท์:</div>
+                    <div class="info-value">081-234-5678</div>
+                </div>
+            </div>
+            <div class="info-box">
+                <h3>เอกสาร (Document Info)</h3>
+                <div class="info-row">
+                    <div class="info-label">เลขที่:</div>
+                    <div class="info-value">QT-2567/0189</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">วันที่/เวลา:</div>
+                    <div class="info-value">29 มกราคม 2567 เวลา 14:30</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">ยืนยันภายใน:</div>
+                    <div class="info-value" style="color: var(--auspicious-red);">30 มกราคม 2567 เวลา 14:30 (24 ชั่วโมง)
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">ราคาทองแท่ง:</div>
+                    <div class="info-value"><span style="color: var(--dark-gold);">34,100 บาท</span> <span>(ณ เวลาออกเอกสาร)</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">ราคารูปพรรณ:</div>
+                    <div class="info-value"><span style="color: var(--dark-gold);">34,600 บาท</span> <span>(ณ เวลาออกเอกสาร)</span></div>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 5%; text-align: center;">#</th>
+                        <th class="col-desc">รายการสินค้า (Description)</th>
+                        <th class="col-weight">น้ำหนัก<br>(Weight)</th>
+                        <th class="col-total">จำนวนเงิน<br>(Amount)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td style="text-align: center;">1</td>
+                        <td>
+                            <div class="item-name">ทองหลอม (Melting Gold)</div>
+                            <div class="item-detail">รับซื้อคืนตามสภาพ เปอร์เซ็นต์ทองตามการวิเคราะห์</div>
+                        </td>
+                        <td style="text-align: center;">45.5 กรัม</td>
+                        <td style="text-align: right;">95,500.00</td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="text-align: center;">2</td>
+                        <td>
+                            <div class="item-name">ทองคำแท่ง 96.5% (Gold Bar)</div>
+                            <div class="item-detail">ยี่ห้อมาตรฐานสมาคมฯ พร้อมใบรับประกัน</div>
+                        </td>
+                        <td style="text-align: center;">5 บาท</td>
+                        <td style="text-align: right;">170,500.00</td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="text-align: center;">3</td>
+                        <td>
+                            <div class="item-name">ทองรูปพรรณ (Gold Ornament 96.5%)</div>
+                            <div class="item-detail">สร้อยคอลายผ่าหวายตัน (รวมค่ากำเหน็จ)</div>
+                        </td>
+                        <td style="text-align: center;">2 บาท</td>
+                        <td style="text-align: right;">69,200.00</td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="text-align: center;">4</td>
+                        <td>
+                            <div class="item-name">กรอบพระ/ตลับทอง (Gold Casing)</div>
+                            <div class="item-detail">กรอบทอง 90% ยกซุ้มหัวสิงห์ (งานสั่งทำ)</div>
+                        </td>
+                        <td style="text-align: center;">8.4 กรัม</td>
+                        <td style="text-align: right;">18,500.00</td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="text-align: center;">5</td>
+                        <td>
+                            <div class="item-name">ทอง 9K (37.5%)</div>
+                            <div class="item-detail">แหวนเพชรแถว ตัวเรือนทอง 9K White Gold</div>
+                        </td>
+                        <td style="text-align: center;">2.5 กรัม</td>
+                        <td style="text-align: right;">4,500.00</td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="text-align: center;">6</td>
+                        <td>
+                            <div class="item-name">ทอง 14K (58.5%)</div>
+                            <div class="item-detail">ต่างหูสตั๊ดพลอยแท้ ตัวเรือนทอง 14K</div>
+                        </td>
+                        <td style="text-align: center;">3.2 กรัม</td>
+                        <td style="text-align: right;">8,900.00</td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="text-align: center;">7</td>
+                        <td>
+                            <div class="item-name">ทอง 18K (75%)</div>
+                            <div class="item-detail">สร้อยข้อมืออิตาลี (Italy Gold Chain)</div>
+                        </td>
+                        <td style="text-align: center;">7.6 กรัม</td>
+                        <td style="text-align: right;">19,800.00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        
+        <div style="margin-top: auto;">
+            <div class="page-note">หน้าที่ 1 / 2 (มีต่อหน้าถัดไป)</div>
+        </div>
+
+    </div>
+
+    
+    <div class="invoice-container">
+
+        
+        <div class="header-section">
+            <div class="shop-branding">
+                <div class="logo-placeholder">
+                    <img src="https://ui-avatars.com/api/?name=Gold&background=c59d5f&color=fff&size=128"
+                        alt="ห้างทองเยาวราช" class="logo-img">
+                </div>
+                <div class="shop-info">
+                    <h1>ห้างทองเยาวราช (สาขาใหญ่)</h1>
+                    <p>
+                        88/8 ถนนเยาวราช แขวงสัมพันธวงศ์ เขตสัมพันธวงศ์ กรุงเทพฯ 10100<br>
+                        โทร: 02-123-4567 | มือถือ: 089-999-8888<br>
+                        LINE: @YaowaratGold | เลขประจำตัวผู้เสียภาษี: 0105558123456
+                    </p>
+                </div>
+            </div>
+            <div class="doc-title">
+                <h2>ใบเสนอราคา</h2>
+                <span>QUOTATION</span>
+            </div>
+        </div>
+
+        
+        <div class="info-grid">
+            <div class="info-box">
+                <h3>ลูกค้า (Customer)</h3>
+                <div class="info-row">
+                    <div class="info-label">ชื่อลูกค้า:</div>
+                    <div class="info-value">คุณสมหญิง รักดี</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">ที่อยู่:</div>
+                    <div class="info-value">123/4 หมู่บ้านเศรษฐี ถ.สุขุมวิท เขตวัฒนา กทม.</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">โทรศัพท์:</div>
+                    <div class="info-value">081-234-5678</div>
+                </div>
+            </div>
+            <div class="info-box">
+                <h3>เอกสาร (Document Info)</h3>
+                <div class="info-row">
+                    <div class="info-label">เลขที่:</div>
+                    <div class="info-value">QT-2567/0189</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">วันที่/เวลา:</div>
+                    <div class="info-value">29 มกราคม 2567 เวลา 14:30</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">ยืนยันภายใน:</div>
+                    <div class="info-value" style="color: var(--auspicious-red);">30 มกราคม 2567 เวลา 14:30 (24 ชั่วโมง)
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">ราคาทองแท่ง:</div>
+                    <div class="info-value"><span style="color: var(--dark-gold);">34,100 บาท</span> <span>(ณ เวลาออกเอกสาร)</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">ราคารูปพรรณ:</div>
+                    <div class="info-value"><span style="color: var(--dark-gold);">34,600 บาท</span> <span>(ณ เวลาออกเอกสาร)</span></div>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 5%; text-align: center;">#</th>
+                        <th class="col-desc">รายการสินค้า (Description)</th>
+                        <th class="col-weight">น้ำหนัก<br>(Weight)</th>
+                        <th class="col-total">จำนวนเงิน<br>(Amount)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td style="text-align: center;">8</td>
+                        <td>
+                            <div class="item-name">อื่น ๆ (Others)</div>
+                            <div class="item-detail">ค่าบริการซ่อม/ชุบ ล้างเครื่องประดับ</div>
+                        </td>
+                        <td style="text-align: center;">-</td>
+                        <td style="text-align: right;">500.00</td>
+                    </tr>
+
+                    
+                    <tr>
+                        <td colspan="4" style="height: 20px;"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        
+        <div class="summary-section">
+            <div class="remarks">
+                <strong>เงื่อนไขและข้อกำหนด (Terms & Conditions)</strong>
+                <ul>
+                    <li>ราคานี้อ้างอิงราคาทองคำแท่งสมาคมฯ ณ วันและเวลาที่ออกเอกสาร</li>
+                    <li>ราคาอาจเปลี่ยนแปลงได้โดยไม่ต้องแจ้ง ขึ้นอยู่กับความผันผวนของตลาดโลก</li>
+                    <li>กรณีสั่งทำสินค้า (Made to order) ต้องมัดจำ 30% ของราคาประเมิน</li>
+                    <li>เลขที่บัญชี: ธนาคารกสิกรไทย 123-4-56789-0 (ห้างทองเยาวราช)</li>
+                </ul>
+            </div>
+            <div class="totals">
+                <div class="total-row">
+                    <span>รวมเป็นเงิน (Subtotal)</span>
+                    <span>387,400.00</span>
+                </div>
+                <div class="total-row">
+                    <span>ส่วนลดพิเศษ (Discount)</span>
+                    <span style="color: var(--auspicious-red);">-1,400.00</span>
+                </div>
+                <div class="total-row">
+                    <span>ภาษีมูลค่าเพิ่ม 7% (VAT)</span>
+                    <span>(รวมในราคาขาย)</span>
+                </div>
+                <div class="total-row grand-total">
+                    <span>ยอดสุทธิ (Net Total)</span>
+                    <span>386,000.00</span>
+                </div>
+                <div class="baht-text">(สามแสนแปดหมื่นหกพันบาทถ้วน)</div>
+            </div>
+        </div>
+
+        
+        <div class="footer-section">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div class="signature-text">ผู้สั่งซื้อสินค้า (Customer)</div>
+                <div class="signature-text">วันที่ 29/01/2567</div>
+            </div>
+            <div class="signature-box">
+                
+                <div class="signature-line"></div>
+                <div class="signature-text">ผู้มีอำนาจลงนาม</div>
+                <div class="signature-text">วันที่ 29/01/2567</div>
+            </div>
+        </div>
+
+        <div class="page-note">หน้าที่ 2 / 2</div>
+
+    </div>
+</body>
+
+</html>

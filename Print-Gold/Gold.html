@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ใบเสนอราคา - {{shop.name}}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;700&family=Sarabun:wght@300;400;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      /* Gold Theme Colors */
+      --primary-gold: #c59d5f;
+      --dark-gold: #997b3d;
+      --light-gold: #f9f3e5;
+      --auspicious-red: #a93226;
+      /* สีแดงมงคลสำหรับตัวเลขสำคัญ */
+      --text-dark: #333333;
+      --text-grey: #666666;
+      --border-color: #e0d0b8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+      background-color: #f0f0f0;
+      padding: 30px;
+      color: var(--text-dark);
+      -webkit-print-color-adjust: exact;
+    }
+
+    /* Container Style - Represents one A4 Page */
+    .invoice-container {
+      max-width: 210mm;
+      /* A4 Width */
+      min-height: 297mm;
+      /* A4 Height (Modified to min-height for flexibility) */
+      margin: 0 auto 30px auto;
+      background-color: white;
+      padding: 20px;
+      position: relative;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      border-top: 5px solid var(--primary-gold);
+      border-bottom: 5px solid var(--primary-gold);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Watermark Background */
+    .invoice-container::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 300px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f9f3e5'%3E%3Cpath d='M4 4h16v16H4V4m18-2H2v20h20V2M12 8l-2 4h4l-2-4z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Header Section */
+    .header-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 15px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .shop-branding {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .logo-placeholder {
+      width: 80px;
+      height: 80px;
+      /* background-color: var(--primary-gold); */
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .shop-info h1 {
+      color: var(--dark-gold);
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 5px;
+      letter-spacing: 0.5px;
+    }
+
+    .shop-info p {
+      font-size: 12px;
+      color: var(--text-grey);
+      line-height: 1.4;
+    }
+
+    .doc-title {
+      text-align: right;
+    }
+
+    .doc-title h2 {
+      color: var(--auspicious-red);
+      font-size: 28px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .doc-title span {
+      font-size: 12px;
+      color: var(--primary-gold);
+      font-weight: 600;
+      letter-spacing: 2px;
+    }
+
+    /* Info Grid */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .info-box h3 {
+      color: var(--dark-gold);
+      font-size: 14px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 5px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .info-row {
+      display: flex;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .info-label {
+      width: 90px;
+      color: var(--text-grey);
+      font-weight: 600;
+    }
+
+    .info-value {
+      flex: 1;
+      color: var(--text-dark);
+    }
+
+    /* Table */
+    .table-container {
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
+      flex-grow: 1;
+      /* No min-height to allow content to dictate space, prevents large gaps */
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      background-color: var(--light-gold);
+      color: var(--dark-gold);
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: left;
+      border-top: 1px solid var(--primary-gold);
+      border-bottom: 1px solid var(--primary-gold);
+    }
+
+    td {
+      padding: 10px 10px;
+      border-bottom: 1px solid #eee;
+      font-size: 13px;
+      vertical-align: top;
+    }
+
+    .col-desc {
+      width: 60%;
+    }
+
+    .col-weight {
+      width: 20%;
+      text-align: center;
+    }
+
+    .col-total {
+      width: 20%;
+      text-align: right;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .item-name {
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: 2px;
+    }
+
+    .item-detail {
+      font-size: 11px;
+      color: var(--text-grey);
+    }
+
+    /* Summary Section */
+    .summary-section {
+      display: flex;
+      justify-content: space-between;
+      margin-top: auto;
+      /* Push to bottom */
+      padding-top: 20px;
+      position: relative;
+      z-index: 1;
+      page-break-inside: avoid;
+    }
+
+    .remarks {
+      width: 55%;
+      font-size: 11px;
+      color: var(--text-grey);
+      background-color: #fafafa;
+      padding: 12px;
+      border-radius: 4px;
+      border-left: 3px solid var(--primary-gold);
+    }
+
+    .remarks strong {
+      color: var(--dark-gold);
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .remarks ul {
+      padding-left: 15px;
+      margin-top: 5px;
+    }
+
+    .remarks li {
+      margin-bottom: 3px;
+    }
+
+    .totals {
+      width: 40%;
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+      color: var(--text-grey);
+    }
+
+    .total-row.grand-total {
+      border-top: 2px solid var(--primary-gold);
+      border-bottom: 2px solid var(--primary-gold);
+      margin-top: 10px;
+      padding: 10px 0;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--auspicious-red);
+      background-color: var(--light-gold);
+      padding-left: 10px;
+      padding-right: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .baht-text {
+      text-align: right;
+      font-size: 11px;
+      color: var(--text-grey);
+      margin-top: 5px;
+      font-style: italic;
+    }
+
+    /* Footer / Signature */
+    .footer-section {
+      margin-top: 30px;
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      z-index: 1;
+      page-break-inside: avoid;
+    }
+
+    .signature-box {
+      text-align: center;
+      width: 200px;
+    }
+
+    .signature-line {
+      border-bottom: 1px solid #ccc;
+      margin-bottom: 10px;
+      height: 40px;
+    }
+
+    .signature-text {
+      font-size: 12px;
+      color: var(--text-grey);
+    }
+
+    /* Page Note Style (Added as requested) */
+    .page-note {
+      text-align: right;
+      font-size: 12px;
+      color: #999;
+      margin-top: 10px;
+      font-style: italic;
+      /* To hide via variable empty check or logic, handled in HTML/Template engine */
+    }
+
+    /* Print Settings */
+    @media print {
+      @page {
+        size: A4;
+        margin: 0;
+      }
+
+      body {
+        background: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .invoice-container {
+        box-shadow: none;
+        border: none;
+        width: 210mm;
+        min-height: 297mm;
+        /* Ensure consistent layout */
+        padding: 15mm 20mm;
+        margin: 0;
+        /* overflow removed to allow content to flow */
+      }
+
+      .remarks {
+        background-color: transparent;
+        border: 1px solid #eee;
+        border-left: 3px solid var(--primary-gold);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="invoice-container">
+
+    
+    <div class="header-section">
+      <div class="shop-branding">
+        <div class="logo-placeholder">
+          {{Logo}}
+        </div>
+        <div class="shop-info">
+          <h1>{{shop.name}}</h1>
+          <p>
+            {{shop.address}}<br>
+            โทร: {{shop.phone}} | มือถือ: {{shop.mobile}}<br>
+            LINE: {{shop.lineId}} | เลขประจำตัวผู้เสียภาษี: {{shop.taxId}}
+          </p>
+        </div>
+      </div>
+      <div class="doc-title">
+        <h2>ใบเสนอราคา</h2>
+        <span>QUOTATION</span>
+      </div>
+    </div>
+
+    
+    <div class="info-grid">
+      <div class="info-box">
+        <h3>ลูกค้า (Customer)</h3>
+        <div class="info-row">
+          <div class="info-label">ชื่อลูกค้า:</div>
+          <div class="info-value">{{customer.name}}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">ที่อยู่:</div>
+          <div class="info-value">{{customer.address}}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">โทรศัพท์:</div>
+          <div class="info-value">{{customer.phone}}</div>
+        </div>
+      </div>
+      <div class="info-box">
+        <h3>เอกสาร (Document Info)</h3>
+        <div class="info-row">
+          <div class="info-label">เลขที่:</div>
+          <div class="info-value">{{document.number}}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">วันที่/เวลา:</div>
+          <div class="info-value">{{document.issueDate}}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">ยืนยันภายใน:</div>
+          <div class="info-value" style="color: var(--auspicious-red);">{{document.validUntil}}
+            ({{document.validDuration}})</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">ราคาทองแท่ง:</div>
+          <div class="info-value"><span style="color: var(--dark-gold);">{{gold.spotPrice}}</span> <span>(ณ เวลาออกเอกสาร)</span></div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">ราคารูปพรรณ:</div>
+          <div class="info-value"><span style="color: var(--dark-gold);">{{gold.ornamentPrice}}</span> <span>(ณ เวลาออกเอกสาร)</span></div>
+        </div>
+      </div>
+    </div>
+
+    
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 5%; text-align: center;">#</th>
+            <th class="col-desc">รายการสินค้า (Description)</th>
+            <th class="col-weight">น้ำหนัก<br>(Weight)</th>
+            <th class="col-total">จำนวนเงิน<br>(Amount)</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+          <tr>
+            <td style="text-align: center;">{{item.index}}</td>
+            <td>
+              <div class="item-name">{{item.name}}</div>
+              <div class="item-detail">{{item.detail}}</div>
+            </td>
+            <td style="text-align: center;">{{item.weight}}</td>
+            <td style="text-align: right;">{{item.totalPrice}}</td>
+          </tr>
+          
+
+          
+          <tr>
+            <td colspan="4" style="height: 20px;"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    
+    <div class="summary-section">
+      <div class="remarks">
+        <strong>เงื่อนไขและข้อกำหนด (Terms & Conditions)</strong>
+        <ul>
+          
+          <li>{{term.text}}</li>
+          
+          
+          
+          
+          
+          
+        </ul>
+      </div>
+      <div class="totals">
+        <div class="total-row">
+          <span>รวมเป็นเงิน (Subtotal)</span>
+          <span>{{summary.subtotal}}</span>
+        </div>
+        <div class="total-row">
+          <span>ส่วนลดพิเศษ (Discount)</span>
+          <span style="color: var(--auspicious-red);">{{summary.discount}}</span>
+        </div>
+        <div class="total-row">
+          <span>ภาษีมูลค่าเพิ่ม 7% (VAT)</span>
+          <span>{{summary.vat}}</span>
+        </div>
+        <div class="total-row grand-total">
+          <span>ยอดสุทธิ (Net Total)</span>
+          <span>{{summary.netTotal}}</span>
+        </div>
+        <div class="baht-text">({{summary.totalText}})</div>
+      </div>
+    </div>
+
+    
+    <div class="footer-section">
+      <div class="signature-box">
+        <div class="signature-line"></div>
+        <div class="signature-text">ผู้สั่งซื้อสินค้า (Customer)</div>
+        <div class="signature-text">วันที่ {{document.signDate}}</div>
+      </div>
+      <div class="signature-box">
+        
+        <div class="signature-line"></div>
+        <div class="signature-text">ผู้มีอำนาจลงนาม</div>
+        <div class="signature-text">วันที่ {{document.signDate}}</div>
+      </div>
+    </div>
+
+    
+    
+    <div class="page-note">{{document.pageNote}}</div>
+
+  </div>
+</body>
+
+</html>

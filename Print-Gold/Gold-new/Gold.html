@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="th">
+<!--
+  ╔═══════════════════════════════════════════════════════════════════════════╗
+  ║  ใบเสนอราคา - Template (Handlebars Placeholders)                           ║
+  ║  ไฟล์นี้ใช้เป็น Template สำหรับ Render ข้อมูลจริงผ่าน Backend               ║
+  ╠═══════════════════════════════════════════════════════════════════════════╣
+  ║  📌 กฏการแบ่งหน้า (Pagination Rules):                                       ║
+  ║  - สูงสุด 15 รายการต่อหน้า                                                  ║
+  ║  - หากมีรายการเกิน 15 → สร้าง .invoice-container ใหม่สำหรับหน้าถัดไป        ║
+  ║  - Section สรุป (Stock Summary, Payment, Totals, Terms, Signature)          ║
+  ║    ให้แสดงเฉพาะหน้าสุดท้ายเท่านั้น                                          ║
+  ║  - ทุกหน้าจะมี Header และข้อมูลลูกค้า/เอกสาร เหมือนกัน                        ║
+  ╠═══════════════════════════════════════════════════════════════════════════╣
+  ║  📋 Placeholders ที่ใช้:                                                    ║
+  ║  - {{shop.*}}      : ข้อมูลร้านค้า (name, logo, address, phone, lineId)    ║
+  ║  - {{customer.*}}  : ข้อมูลลูกค้า (name, address, phone)                   ║
+  ║  - {{document.*}}  : ข้อมูลเอกสาร (number, issueDate, pageNote)            ║
+  ║  - {{gold.*}}      : ราคาทอง (barPrice, ornamentPrice)                     ║
+  ║  - {{#each items}} : วนลูปแสดงรายการสินค้า                                  ║
+  ║  - {{#each summaryByType}} : วนลูปแสดงสรุปตามประเภททอง                      ║
+  ║  - {{summary.*}}   : ยอดสรุป (totalWeight, subtotal, vat, netTotal, etc.)  ║
+  ╚═══════════════════════════════════════════════════════════════════════════╝
+-->
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ใบเสนอราคา - {{shop.name}}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;700&family=Sarabun:wght@300;400;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      /* Gold Theme Colors */
+      --primary-gold: #c59d5f;
+      --dark-gold: #997b3d;
+      --light-gold: #f9f3e5;
+      --auspicious-red: #a93226;
+      --text-dark: #333333;
+      --text-grey: #666666;
+      --border-color: #e0d0b8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+      background-color: #f0f0f0;
+      padding: 20px;
+      color: var(--text-dark);
+      -webkit-print-color-adjust: exact;
+      font-size: 11px;
+    }
+
+    .invoice-container {
+      max-width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto 20px auto;
+      background-color: white;
+      padding: 20px 15px;
+      position: relative;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      border-top: 5px solid var(--primary-gold);
+      border-bottom: 5px solid var(--primary-gold);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    .shop-branding {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-placeholder {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .logo-fallback {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--light-gold);
+      border: 1px dashed var(--border-color);
+      border-radius: 50%;
+      font-size: 8px;
+      color: var(--text-grey);
+      text-align: center;
+    }
+
+    .shop-info h1 {
+      color: var(--dark-gold);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .shop-info p {
+      font-size: 10px;
+      color: var(--text-grey);
+      line-height: 1.3;
+    }
+
+    .doc-title {
+      text-align: right;
+    }
+
+    .doc-title h2 {
+      color: var(--auspicious-red);
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+
+    .info-box h3 {
+      color: var(--dark-gold);
+      font-size: 11px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 3px;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }
+
+    .info-row {
+      display: flex;
+      margin-bottom: 2px;
+      font-size: 10px;
+    }
+
+    .info-label {
+      width: 90px;
+      color: var(--text-grey);
+      font-weight: 600;
+    }
+
+    .info-value {
+      flex: 1;
+      color: var(--text-dark);
+    }
+
+    .table-container {
+      margin-bottom: 15px;
+      flex-grow: 1;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      background-color: var(--light-gold);
+      color: var(--dark-gold);
+      padding: 5px 3px;
+      font-size: 9px;
+      font-weight: 700;
+      text-align: center;
+      border-top: 1px solid var(--primary-gold);
+      border-bottom: 1px solid var(--primary-gold);
+    }
+
+    td {
+      padding: 4px 3px;
+      border-bottom: 1px solid #eee;
+      font-size: 9px;
+      vertical-align: middle;
+    }
+
+    .col-idx {
+      width: 3%;
+      text-align: center;
+    }
+
+    .col-desc {
+      width: 25%;
+      text-align: left;
+    }
+
+    .col-ref {
+      width: 12%;
+      text-align: right;
+    }
+
+    .col-adj {
+      width: 10%;
+      text-align: right;
+    }
+
+    .col-purity {
+      width: 7%;
+      text-align: center;
+    }
+
+    .col-weight {
+      width: 11%;
+      text-align: center;
+    }
+
+    .col-gram {
+      width: 12%;
+      text-align: right;
+    }
+
+    .col-total {
+      width: 13%;
+      text-align: right;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .type-summary-box {
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      background-color: #fcfcfc;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+    }
+
+    .type-summary-box h4 {
+      font-size: 9.5px;
+      color: var(--dark-gold);
+      margin-bottom: 4px;
+      border-bottom: 1px dashed var(--border-color);
+      padding-bottom: 2px;
+      text-transform: uppercase;
+    }
+
+    .type-summary-table {
+      width: 100%;
+      font-size: 9px;
+    }
+
+    .type-summary-table th {
+      color: var(--text-grey);
+      font-weight: 700;
+      text-align: left;
+      padding: 2px 4px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .type-summary-table td {
+      padding: 2px 4px;
+      border-bottom: 1px solid #f9f9f9;
+    }
+
+    .type-val-bold {
+      font-weight: 600;
+      color: var(--text-dark);
+      font-size: 12px;
+    }
+
+    .summary-section {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 5px;
+    }
+
+    .remarks {
+      width: 45%;
+      font-size: 9px;
+      color: var(--text-grey);
+      background-color: #fafafa;
+      padding: 8px;
+      border-radius: 4px;
+      border-left: 3px solid var(--primary-gold);
+    }
+
+    .payment-method {
+      width: 45%;
+      font-size: 9px;
+      color: var(--text-dark);
+      background-color: #fafafa;
+      padding: 8px;
+      border-radius: 4px;
+      border-left: 3px solid var(--primary-gold);
+    }
+
+    .payment-method strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--dark-gold);
+      font-size: 9.5px;
+    }
+
+    .payment-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .payment-checkbox input[type="checkbox"] {
+      width: 12px;
+      height: 12px;
+      accent-color: var(--primary-gold);
+    }
+
+    .payment-input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .payment-input-group {
+      flex: 1;
+    }
+
+    .payment-input-group label {
+      display: block;
+      font-size: 8px;
+      color: var(--text-grey);
+      margin-bottom: 2px;
+    }
+
+    .payment-input-group input {
+      width: 100%;
+      border: 1px solid var(--border-color);
+      border-radius: 3px;
+      padding: 8px 5px;
+      font-size: 9px;
+      font-family: inherit;
+    }
+
+    .payment-input-group input:focus {
+      outline: none;
+      border-color: var(--primary-gold);
+    }
+
+    .terms-disclaimer {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background-color: #fffdf8;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-size: 8.5px;
+      color: var(--text-grey);
+      line-height: 1.5;
+    }
+
+    .terms-disclaimer strong {
+      display: block;
+      font-size: 9px;
+      color: var(--dark-gold);
+      margin-bottom: 4px;
+    }
+
+    .terms-disclaimer p {
+      margin: 0;
+      text-indent: 1.5em;
+    }
+
+    .totals {
+      width: 52%;
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+      font-size: 10.5px;
+      color: var(--text-grey);
+    }
+
+    .total-row.grand-total {
+      border-top: 2px solid var(--primary-gold);
+      border-bottom: 2px solid var(--primary-gold);
+      margin-top: 4px;
+      padding: 5px 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--auspicious-red);
+      background-color: var(--light-gold);
+    }
+
+    .baht-text {
+      text-align: right;
+      margin-top: 3px;
+      font-style: italic;
+      color: var(--text-grey);
+      font-size: 9.5px;
+    }
+
+    .footer-section {
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .signature-box {
+      text-align: center;
+      width: 170px;
+    }
+
+    .signature-line {
+      border-bottom: 1px solid #ccc;
+      margin-bottom: 5px;
+      height: 25px;
+    }
+
+    @media print {
+      @page {
+        size: A4;
+        margin: 0;
+      }
+
+      body {
+        background: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .invoice-container {
+        box-shadow: none;
+        border: none;
+        width: 210mm;
+        min-height: 297mm;
+        padding: 10mm 15mm;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="invoice-container">
+
+    <!-- 📄 Header Section: แสดงข้อมูลร้านและหัวเอกสาร -->
+    <div class="header-section">
+      <div class="shop-branding">
+        <div class="logo-placeholder">
+          <img src="{{shop.logo}}" alt="{{shop.name}}" class="logo-img"
+            onload="this.style.display='block'; this.nextElementSibling.style.display='none';"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="display: none;">
+          <div class="logo-fallback">{{LOGO}}</div>
+        </div>
+        <div class="shop-info">
+          <h1>{{shop.name}}</h1>
+          <p>{{shop.address}}<br>โทร: {{shop.phone}} | LINE: {{shop.lineId}}</p>
+        </div>
+      </div>
+      <div class="doc-title">
+        <h2>ใบเสนอราคา</h2>
+        <span
+          style="font-size: 9px; color: var(--primary-gold); font-weight: 600; letter-spacing: 1px;">QUOTATION</span>
+      </div>
+    </div>
+
+    <!-- 📋 Info Grid: ข้อมูลลูกค้าและข้อมูลเอกสาร -->
+    <div class="info-grid">
+      <div class="info-box">
+        <h3>ลูกค้า (Customer)</h3>
+        <div class="info-row">
+          <div class="info-label">ชื่อลูกค้า:</div>
+          <div class="info-value">{{customer.name}}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">ที่อยู่:</div>
+          <div class="info-value">{{customer.address}}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">โทรศัพท์:</div>
+          <div class="info-value">{{customer.phone}}</div>
+        </div>
+      </div>
+      <div class="info-box">
+        <h3>ข้อมูลเอกสาร (Document)</h3>
+        <div class="info-row">
+          <div class="info-label">เลขที่:</div>
+          <div class="info-value">{{document.number}}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">วันที่ออก:</div>
+          <div class="info-value">{{document.issueDate}}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">ราคาทองแท่ง:</div>
+          <div class="info-value" style="font-weight: 700; color: var(--auspicious-red);">{{gold.barPrice}} <span
+              style="font-weight: 400; font-size: 9px; color: var(--text-grey);">(ณ เวลาออกเอกสาร)</span></div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">ราคารูปพรรณ:</div>
+          <div class="info-value" style="font-weight: 700; color: var(--auspicious-red);">{{gold.ornamentPrice}} <span
+              style="font-weight: 400; font-size: 9px; color: var(--text-grey);">(ณ เวลาออกเอกสาร)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!--
+      📦 Items Table: ตารางรายการสินค้า
+      - ใช้ {{#each items}} สำหรับวนลูปแสดงรายการ
+      - หากมีเกิน 15 รายการ ให้แบ่งหน้าใหม่
+    -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-idx">#</th>
+            <th class="col-desc">รายการสินค้า</th>
+            <th class="col-ref">ราคา/1฿</th>
+            <th class="col-adj">ราคาบวก</th>
+            <th class="col-purity">%</th>
+            <th class="col-weight">น้ำหนัก (ก.)</th>
+            <th class="col-gram">ราคา/กรัม</th>
+            <th class="col-total">จำนวนเงิน</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- {{#each items}} -->
+          <tr>
+            <td class="col-idx">{{item.index}}</td>
+            <td class="col-desc">
+              <div class="item-name">{{item.name}}</div>
+              <div class="item-detail">{{item.detail}}</div>
+            </td>
+            <td class="col-ref">{{item.refPrice}}</td>
+            <td class="col-adj">{{item.premiumLoss}}</td>
+            <td class="col-purity">{{item.purity}}</td>
+            <td class="col-weight">{{item.weight}}</td>
+            <td class="col-gram">{{item.pricePerGram}}</td>
+            <td class="col-total">{{item.totalPrice}}</td>
+          </tr>
+          <!-- {{/each}} -->
+        </tbody>
+      </table>
+    </div>
+
+    <!--
+      📊 Stock Summary: สรุปยอดแยกตามประเภททอง
+      - ใช้ {{#each summaryByType}} สำหรับวนลูปแสดงสรุป
+      - แสดงเฉพาะประเภททองที่มีในรายการสินค้าเท่านั้น
+      - Section นี้แสดงเฉพาะหน้าสุดท้าย
+    -->
+    <div class="type-summary-box">
+      <h4>สรุปยอดแยกตามประเภททอง (Stock Summary)</h4>
+      <table class="type-summary-table">
+        <thead>
+          <tr>
+            <th style="width: 35%;">รายการ (ประเภททอง)</th>
+            <th style="width: 25%; text-align: center;">น้ำหนัก (กรัม)</th>
+            <th style="width: 40%; text-align: right;">ราคา (บาท)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- NOTE: ถ้าไม่มีใน 'รายการสินค้า (ประเภททอง)' ไม่ต้องดึงมาแสดง -->
+          <!-- {{#each summaryByType}} -->
+          <tr>
+            <td>{{this.label}}</td>
+            <td style="text-align: center;" class="type-val-bold">{{this.weight}}</td>
+            <td style="text-align: right;" class="type-val-bold">{{this.amount}}</td>
+          </tr>
+          <!-- {{/each}} -->
+        </tbody>
+      </table>
+    </div>
+
+    <!--
+      💰 Summary Section: วิธีชำระเงินและยอดรวม
+      - Section นี้แสดงเฉพาะหน้าสุดท้าย
+    -->
+    <div class="summary-section">
+      <div class="payment-method">
+        <strong>วิธีชำระเงิน (Payment Method)</strong>
+        <div class="payment-checkbox">
+          <input type="checkbox" id="pay-cash">
+          <label for="pay-cash">เงินสด (Cash)</label>
+        </div>
+        <div class="payment-checkbox">
+          <input type="checkbox" id="pay-transfer">
+          <label for="pay-transfer">โอนเงิน (Transfer)</label>
+        </div>
+        <div class="payment-checkbox">
+          <input type="checkbox" id="pay-cheque">
+          <label for="pay-cheque">เช็ค (Cheque)</label>
+        </div>
+        <div class="payment-input-row">
+          <div class="payment-input-group">
+            <label>วันที่ชำระ (Date)</label>
+            <input type="text" placeholder="____________________________">
+          </div>
+          <div class="payment-input-group">
+            <label>จำนวนเงิน (Amount)</label>
+            <input type="text" placeholder="฿ ______________________________">
+          </div>
+        </div>
+      </div>
+      <div class="totals">
+        <div class="total-row"><span>น้ำหนักรวม (Total Weight)</span><span
+            style="font-weight: 600;">{{summary.totalWeight}} กรัม</span></div>
+        <div class="total-row"><span>รวมเป็นเงิน (Subtotal)</span><span>{{summary.subtotal}}</span></div>
+        <div class="total-row"><span>ภาษีมูลค่าเพิ่ม 7% (VAT)</span><span>{{summary.vat}}</span></div>
+        <div class="total-row grand-total"><span>ยอดเงินสุทธิ (Net Total)</span><span>{{summary.netTotal}}</span></div>
+        <div class="baht-text">({{summary.totalText}})</div>
+      </div>
+    </div>
+
+    <!-- 📜 Terms & Conditions: เงื่อนไขและข้อกำหนด (แสดงเฉพาะหน้าสุดท้าย) -->
+    <div class="terms-disclaimer">
+      <strong>เงื่อนไขและข้อกำหนด (Terms & Conditions)</strong>
+      <p>ข้าพเจ้าขอรับรองว่าทรัพย์สินที่นำมาขาย/จำนำเป็นกรรมสิทธิ์ของข้าพเจ้าโดยแท้จริง
+        และขอรับรองว่าของที่นำมาขายนั้นเป็นของที่ได้มาโดยสุจริต
+        หากปรากฏในภายหลังว่าเป็นของที่ได้มาโดยทุจริตหรือผิดกฎหมาย ข้าพเจ้ายินยอมรับผิดชอบทั้งทางแพ่งและอาญาทุกประการ
+        และข้าพเจ้าได้อ่านทบทวนเอกสารฉบับนี้เรียบร้อยแล้ว จึงลงนามไว้เป็นหลักฐาน</p>
+    </div>
+
+    <!-- ✍️ Signature: ลายเซ็น (แสดงเฉพาะหน้าสุดท้าย) -->
+    <div class="footer-section">
+      <div class="signature-box">
+        <div class="signature-line"></div>
+        <div style="font-size: 10px; color: var(--text-grey);">ผู้สั่งซื้อสินค้า (Customer)</div>
+      </div>
+      <div class="signature-box">
+        <div class="signature-line"></div>
+        <div style="font-size: 10px; color: var(--text-grey);">ผู้มีอำนาจลงนาม (Authorized)</div>
+      </div>
+    </div>
+
+    <div style="text-align: right; font-size: 8px; color: #ccc; margin-top: 5px;">{{document.pageNote}}</div>
+  </div>
+</body>
+
+</html>
