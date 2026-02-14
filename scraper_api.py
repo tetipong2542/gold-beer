@@ -175,18 +175,22 @@ def fetch_gold_prices(source_mode: str = SOURCE_AUTO) -> dict:
     result["source_type"] = SOURCE_API
     
     if source_mode == SOURCE_AUTO:
-        # Fallback to scraper if API failed entirely
         if not result.get("success"):
             logger.warning(f"API failed ({result.get('error')}), falling back to scraper...")
             scraper_result = fetch_from_scraper()
             if scraper_result.get("success"):
                 return scraper_result
             logger.warning("Scraper also failed, returning API error")
-        # Fallback to scraper if API data is stale
         elif is_data_stale(result.get("update_time") or ""):
             logger.warning(f"API data is stale (update_time: {result.get('update_time')}), trying scraper...")
+            api_price_change = result.get("price_change", {})
+            api_today_change = result.get("today_change", {})
             scraper_result = fetch_from_scraper()
             if scraper_result.get("success"):
+                if not scraper_result.get("price_change", {}).get("amount"):
+                    scraper_result["price_change"] = api_price_change
+                if not scraper_result.get("today_change", {}).get("amount"):
+                    scraper_result["today_change"] = api_today_change
                 return scraper_result
             logger.warning("Scraper failed, using stale API data")
     
