@@ -300,7 +300,7 @@ def index():
     return jsonify({
         "name": "Thai Gold Price API",
         "version": "2.0.0",
-        "data_source": "GoldTraders.or.th via RakaTong.com API (rakatong.com/api/homepage.php)",
+        "data_source": "GOLD",
         "note": "No Cloudflare bypass needed - direct API access via RakaTong"
     })
 
@@ -428,7 +428,7 @@ def refresh_prices():
             except (ValueError, TypeError):
                 pass
     
-    fetch_gold_prices_job()
+    fetch_gold_prices_job(force=True)
     with data_lock:
         return jsonify({
             "success": True,
