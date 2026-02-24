@@ -179,27 +179,22 @@ def fetch_gold_prices_job(force=False):
     logger.info("Fetching gold prices...")
     result = fetch_gold_prices(gold_source_settings["mode"])
     
+    needs_reschedule = 0
     with data_lock:
         if result.get("success"):
             new_bar_sell = result.get("gold_bar", {}).get("sell")
-            
             api_price_change = result.get("price_change", {})
             api_today_change = result.get("today_change", {})
-            
             if not api_price_change.get("amount") and not api_today_change.get("amount"):
                 calculated_changes = calculate_price_changes(new_bar_sell)
                 result["price_change"] = calculated_changes["price_change"]
                 result["today_change"] = calculated_changes["today_change"]
-            
             new_change_count = result.get("change_count")
             last_change_count = adaptive_settings["last_change_count"]
-            
             price_changed = (last_change_count is None or new_change_count != last_change_count)
-            
             if price_changed:
                 adaptive_settings["unchanged_count"] = 0
                 adaptive_settings["last_change_count"] = new_change_count
-                
                 history_entry = {
                     "timestamp": result["timestamp"],
                     "gold_bar": result["gold_bar"],
@@ -215,31 +210,34 @@ def fetch_gold_prices_job(force=False):
                 count = adaptive_settings["unchanged_count"]
                 if count in [1, 10, 50, 100] or count % 100 == 0:
                     logger.info(f"Price unchanged (x{count})")
-            
             current_price = result
             gold_source_settings["last_source_used"] = result.get("source_type", "unknown")
-            
             if adaptive_settings["adaptive_enabled"]:
-                adjust_refresh_interval()
+                needs_reschedule = _compute_new_interval()
         else:
             logger.warning(f"Failed to fetch prices: {result.get('error')}")
-    
-    if len(price_history) % 10 == 0:
+    # APScheduler อยู่นอก lock — ป้องกัน deadlock
+    if needs_reschedule:
+        reschedule_fetch_job(needs_reschedule)
+        logger.info(f"Adaptive interval rescheduled: {needs_reschedule}s")
+    with data_lock:
+        history_len = len(price_history)
+    if history_len % 10 == 0 and history_len > 0:
         save_history()
 
 
-def adjust_refresh_interval():
+def _compute_new_interval() -> int:
+    """Compute new adaptive interval. Must be called while holding data_lock.
+    Returns new interval seconds if changed, 0 if no change.
+    Does NOT call APScheduler — caller must reschedule outside the lock.
+    """
     global adaptive_settings
-
     now = datetime.now(THAI_TZ)
     hour = now.hour
     weekday = now.weekday()
-    
     base = adaptive_settings["base_interval"]
     unchanged = adaptive_settings["unchanged_count"]
-    
     is_off_hours = weekday >= 5 or hour < 9 or hour >= 17
-    
     if is_off_hours:
         new_interval = base * 10
     elif unchanged >= 10:
@@ -248,11 +246,10 @@ def adjust_refresh_interval():
         new_interval = base * 3
     else:
         new_interval = base
-    
     if new_interval != adaptive_settings["current_interval"]:
         adaptive_settings["current_interval"] = new_interval
-        reschedule_fetch_job(new_interval)
-        logger.info(f"Adaptive interval: {new_interval}s (unchanged: {unchanged}, off_hours: {is_off_hours})")
+        return new_interval
+    return 0
 
 
 # Initialize scheduler
@@ -395,7 +392,7 @@ def get_history():
 @app.route('/api/gold/history/today')
 def get_history_today():
     """Get today's price history only"""
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = datetime.now(THAI_TZ).strftime('%Y-%m-%d')
     
     with data_lock:
         history_list = [h for h in price_history if h.get('timestamp', '').startswith(today)]
@@ -413,27 +410,39 @@ def get_history_today():
 
 @app.route('/api/gold/refresh', methods=['POST'])
 def refresh_prices():
-    """Force refresh gold prices (with rate limiting)"""
+    """Force refresh gold prices (with rate limiting).
+    BE-1: check+set rate limit flag inside lock (no race).
+    BE-2: ensure timezone-aware comparison always.
+    """
+    rate_limited = False
+    rate_limit_data = None
+
     with data_lock:
         last_update = current_price.get("timestamp")
         if last_update:
             try:
                 last_time = datetime.fromisoformat(last_update)
-                if datetime.now() - last_time < timedelta(seconds=30):
-                    return jsonify({
-                        "success": False,
-                        "error": "Rate limited. Please wait at least 30 seconds between refreshes.",
-                        "data": current_price
-                    }), 429
+                now = datetime.now(THAI_TZ)
+                # BE-2: ป้องกัน naive vs aware mismatch
+                if last_time.tzinfo is None:
+                    last_time = last_time.replace(tzinfo=THAI_TZ)
+                if now - last_time < timedelta(seconds=30):
+                    rate_limited = True
+                    rate_limit_data = dict(current_price)  # snapshot, not mutable ref
             except (ValueError, TypeError):
                 pass
-    
-    fetch_gold_prices_job(force=True)
+
+    if rate_limited:
+        return jsonify({
+            "success": False,
+            "error": "Rate limited. Please wait at least 30 seconds between refreshes.",
+            "data": rate_limit_data
+                    }), 429
     with data_lock:
         return jsonify({
             "success": True,
             "message": "Prices refreshed",
-            "data": current_price
+            "data": dict(current_price)
         })
 
 

@@ -101,6 +101,10 @@
             background: rgba(139, 92, 246, 0.2);
             color: var(--purple);
         }
+        .countdown-badge.quiet {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--red);
+        }
 
         .countdown-value {
             font-weight: 700;
@@ -662,9 +666,9 @@
                     <span class="pulse"></span>
                     <span id="lastUpdate">กำลังโหลด...</span>
                 </div>
-                <div class="status-badge countdown-badge">
+                <div class="status-badge countdown-badge" id="countdownBadge">
                     <i data-lucide="timer" style="width: 16px; height: 16px;"></i>
-                    รีเฟรชใน <span class="countdown-value" id="countdown">--</span> วินาที
+                    <span id="countdownText">รีเฟรชใน <span class="countdown-value" id="countdown">--</span> วินาที<span id="countdownIntervalLabel" style="color:#888;font-size:0.8em;margin-left:4px"></span></span>
                 </div>
             </div>
 
@@ -1047,33 +1051,39 @@ if ($gold['success']) {
   .then(data => console.log('ทองแท่ง:', data.gold_bar.sell));`;
 
         // State
-        let refreshIntervalSec = 60;
+        let refreshIntervalSec = 120;   // base_interval จาก server
+        let currentIntervalSec = 120;   // current_interval จริง (อาจ adaptive สูงกว่า)
         let refreshTimer = null;
         let countdownTimer = null;
-        let countdown = 60;
+        let countdown = 120;
         let adaptiveEnabled = false;
+        let isQuietHoursActive = false;
 
-        // Countdown functions
+        // Countdown functions — ใช้ currentIntervalSec (adaptive จริง หรือ manual)
         function startCountdown() {
-            countdown = refreshIntervalSec;
+            if (isQuietHoursActive) return;
+            const useInterval = adaptiveEnabled ? currentIntervalSec : refreshIntervalSec;
+            countdown = useInterval;
             updateCountdownDisplay();
-
             if (countdownTimer) clearInterval(countdownTimer);
             countdownTimer = setInterval(() => {
                 countdown--;
                 if (countdown <= 0) {
-                    countdown = refreshIntervalSec;
+                    countdown = adaptiveEnabled ? currentIntervalSec : refreshIntervalSec;
                 }
                 updateCountdownDisplay();
             }, 1000);
         }
 
         function updateCountdownDisplay() {
-            document.getElementById('countdown').textContent = countdown;
+            // JS-6: อัปเดต textContent ตรงๆ ไม่ rebuild innerHTML ทุกวินาที
+            const countdownEl = document.getElementById('countdown');
+            if (countdownEl) countdownEl.textContent = countdown;
+            const intervalLabel = document.getElementById('countdownIntervalLabel');
+            if (intervalLabel) intervalLabel.textContent = adaptiveEnabled ? `(interval: ${currentIntervalSec}s)` : '';
         }
-
         function resetCountdown() {
-            countdown = refreshIntervalSec;
+            countdown = adaptiveEnabled ? currentIntervalSec : refreshIntervalSec;
             updateCountdownDisplay();
         }
 
@@ -1082,16 +1092,21 @@ if ($gold['success']) {
                 const res = await fetch('/api/settings');
                 const data = await res.json();
                 if (data.success) {
+                    const prevAdaptive = adaptiveEnabled;
+                    const prevCurrentInterval = currentIntervalSec;
                     adaptiveEnabled = data.settings.adaptive_enabled;
                     refreshIntervalSec = data.settings.base_interval;
-
+                    currentIntervalSec = data.settings.current_interval;
                     document.getElementById('refreshInterval').value = data.settings.base_interval;
                     document.getElementById('currentInterval').textContent = data.settings.base_interval;
                     document.getElementById('adaptiveToggle').checked = adaptiveEnabled;
                     document.getElementById('manualToggle').checked = !adaptiveEnabled;
-                    document.getElementById('adaptiveInterval').textContent = data.settings.current_interval;
+                    document.getElementById('adaptiveInterval').textContent = currentIntervalSec;
                     document.getElementById('unchangedCount').textContent = data.settings.unchanged_count;
-
+                    // ถ้า adaptive interval เปลี่ยน → restart timer ใหม่ด้วย interval ใหม่
+                    if (adaptiveEnabled && currentIntervalSec !== prevCurrentInterval) {
+                        startAutoRefresh();
+                    }
                     updateToggleUI();
                 }
             } catch (e) { console.error('Failed to load settings:', e); }
@@ -1108,6 +1123,8 @@ if ($gold['success']) {
                 document.getElementById('adaptiveToggle').checked = false;
                 adaptiveEnabled = false;
                 await saveSettings({ adaptive_enabled: false });
+                // JS-3: restart timer ด้วย manual interval ทันที
+                startAutoRefresh();
             }
             updateToggleUI();
         }
@@ -1122,16 +1139,10 @@ if ($gold['success']) {
 
         async function saveManualSettings() {
             let interval = parseInt(document.getElementById('refreshInterval').value) || 120;
-
-            // Auto-clamp to valid range
+            // JS-4: ใช้ limit เดียวกัน (60-600) ทั้ง clamp และ validate
             if (interval < 60) interval = 60;
-            if (interval > 500) interval = 500;
-
+            if (interval > 600) interval = 600;
             document.getElementById('refreshInterval').value = interval;
-            if (interval < 60 || interval > 600) {
-                showToast('กรุณาใส่ค่า 60-600 วินาที', true);
-                return;
-            }
             await saveSettings({ base_interval: interval });
             refreshIntervalSec = interval;
             document.getElementById('currentInterval').textContent = interval;
@@ -1229,9 +1240,7 @@ if ($gold['success']) {
         async function fetchPrices() {
             try {
                 const res = await fetch('/api/gold/current');
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}`);
-                }
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 if (!data.success) {
                     showToast(data.error || 'Failed to fetch prices', true);
@@ -1239,7 +1248,8 @@ if ($gold['success']) {
                     return;
                 }
                 updatePrices(data);
-                loadSettings();
+                // JS-2: ไม่เรียก loadSettings() — แค่ sync stats ไม่เสี่ยง restart loop
+                syncAdaptiveStats();
                 resetCountdown();
             } catch (e) {
                 console.error('Error:', e);
@@ -1248,28 +1258,53 @@ if ($gold['success']) {
             }
         }
 
+        // sync เฉพาะ unchanged_count + current_interval — ไม่ restart timer
+        async function syncAdaptiveStats() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                if (!data.success) return;
+                const prev = currentIntervalSec;
+                currentIntervalSec = data.settings.current_interval;
+                document.getElementById('adaptiveInterval').textContent = currentIntervalSec;
+                document.getElementById('unchangedCount').textContent = data.settings.unchanged_count;
+                // ถ้า interval เปลี่ยน และ adaptive mode เปิด — restart timer
+                if (adaptiveEnabled && currentIntervalSec !== prev) {
+                    startAutoRefresh();
+                }
+            } catch (e) { /* silent */ }
+        }
+
         async function refreshPrices() {
             const btn = document.querySelector('.refresh-btn');
             btn.disabled = true;
             btn.innerHTML = '<span class="loading"></span> Loading...';
-
             try {
                 const res = await fetch('/api/gold/refresh', { method: 'POST' });
                 const data = await res.json();
-
                 if (res.status === 429) {
-                    showToast(data.error || 'Rate limited', true);
+                    showToast(data.error || 'Rate limited — รอ 30 วินาที', true);
+                    // ยังดึง /current มาแสดงค่าล่าสุดที่ server มี
+                    const cur = await fetch('/api/gold/current').then(r => r.json()).catch(() => null);
+                    if (cur && cur.success) updatePrices(cur);
                     return;
                 }
-
                 if (!data.success) {
                     showToast(data.error || 'Refresh failed', true);
                     return;
                 }
 
-                updatePrices(data.data);
-                showToast('Refresh successful!');
-                loadSettings();
+                // ดึง /api/gold/current แยกต่างหากเสมอ เพื่อให้ได้ข้อมูลล่าสุดแน่นอน
+                const cur = await fetch('/api/gold/current').then(r => r.json()).catch(() => null);
+                if (cur && cur.success) {
+                    updatePrices(cur);
+                } else {
+                    // fallback: ใช้จาก refresh response
+                    updatePrices(data.data);
+                }
+
+                showToast('Refresh สำเร็จ!');
+                await loadSettings();
                 resetCountdown();
             } catch (e) {
                 showToast('Connection error', true);
@@ -1282,7 +1317,11 @@ if ($gold['success']) {
 
         function startAutoRefresh() {
             if (refreshTimer) clearInterval(refreshTimer);
-            refreshTimer = setInterval(fetchPrices, refreshIntervalSec * 1000);
+            if (isQuietHoursActive) return;
+            // adaptive mode: ใช้ currentIntervalSec (interval จริงจาก server)
+            // manual mode: ใช้ refreshIntervalSec (base_interval ที่ user ตั้ง)
+            const useInterval = adaptiveEnabled ? currentIntervalSec : refreshIntervalSec;
+            refreshTimer = setInterval(fetchPrices, useInterval * 1000);
             startCountdown();
         }
 
@@ -1343,43 +1382,37 @@ if ($gold['success']) {
             });
         }
 
-        function loadWpApiSettings() {
-            fetch('/api/settings')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        const enabled = data.settings.wp_api_enabled;
-                        const toggle = document.getElementById('wpApiToggle');
-                        const content = document.getElementById('wpApiContent');
-                        const status = document.getElementById('wpApiStatus');
-
-                        toggle.checked = enabled;
-                        if (enabled) {
-                            content.classList.remove('hidden');
-                            status.textContent = 'เปิดใช้งาน';
-                            status.style.color = 'var(--green)';
-                        } else {
-                            content.classList.add('hidden');
-                            status.textContent = 'ปิดใช้งาน';
-                            status.style.color = 'var(--red)';
-                        }
-
-                        // Load quiet hours settings
-                        if (data.settings.quiet_hours) {
-                            const qh = data.settings.quiet_hours;
-                            document.getElementById('quietHoursToggle').checked = qh.enabled;
-                            document.getElementById('weekdayEnabled').checked = qh.weekday?.enabled !== false;
-                            document.getElementById('weekdayStart').value = qh.weekday?.start || '18:00';
-                            document.getElementById('weekdayEnd').value = qh.weekday?.end || '08:00';
-                            document.getElementById('weekendEnabled').checked = qh.weekend?.enabled !== false;
-                            document.getElementById('weekendStart').value = qh.weekend?.start || '18:00';
-                            document.getElementById('weekendEnd').value = qh.weekend?.end || '08:00';
-                            
-                            updateQuietHoursUI(qh, data.settings.is_quiet_hours_now);
-                        }
-                    }
-                })
-                .catch(e => console.error('Failed to load WP API settings:', e));
+        async function loadWpApiSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                if (!data.success) return;
+                const enabled = data.settings.wp_api_enabled;
+                const toggle = document.getElementById('wpApiToggle');
+                const content = document.getElementById('wpApiContent');
+                const status = document.getElementById('wpApiStatus');
+                toggle.checked = enabled;
+                if (enabled) {
+                    content.classList.remove('hidden');
+                    status.textContent = 'เปิดใช้งาน';
+                    status.style.color = 'var(--green)';
+                } else {
+                    content.classList.add('hidden');
+                    status.textContent = 'ปิดใช้งาน';
+                    status.style.color = 'var(--red)';
+                }
+                if (data.settings.quiet_hours) {
+                    const qh = data.settings.quiet_hours;
+                    document.getElementById('quietHoursToggle').checked = qh.enabled;
+                    document.getElementById('weekdayEnabled').checked = qh.weekday?.enabled !== false;
+                    document.getElementById('weekdayStart').value = qh.weekday?.start || '18:00';
+                    document.getElementById('weekdayEnd').value = qh.weekday?.end || '08:00';
+                    document.getElementById('weekendEnabled').checked = qh.weekend?.enabled !== false;
+                    document.getElementById('weekendStart').value = qh.weekend?.start || '18:00';
+                    document.getElementById('weekendEnd').value = qh.weekend?.end || '08:00';
+                    updateQuietHoursUI(qh, data.settings.is_quiet_hours_now);
+                }
+            } catch (e) { console.error('Failed to load WP API settings:', e); }
         }
 
         function updateQuietHoursUI(qh, isQuietNow) {
@@ -1419,6 +1452,26 @@ if ($gold['success']) {
                 nowContainer.style.background = 'rgba(34, 197, 94, 0.2)';
                 nowContainer.style.color = 'var(--green)';
             }
+
+            // Stop or resume countdown/auto-refresh based on quiet hours
+            const wasQuiet = isQuietHoursActive;
+            isQuietHoursActive = enabled && isQuietNow;
+            const countdownBadge = document.getElementById('countdownBadge');
+            const countdownText = document.getElementById('countdownText');
+
+            if (isQuietHoursActive) {
+                // Stop countdown and auto-refresh
+                if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+                if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+                countdownBadge.classList.add('quiet');
+                countdownText.innerHTML = 'หยุดดึงข้อมูล (Quiet Hours)';
+            } else {
+                // Resume เสมอ — ทั้งกรณี wasQuiet และกรณี toggle ปิด quiet hours
+                countdownBadge.classList.remove('quiet');
+                if (wasQuiet || !refreshTimer) {
+                    startAutoRefresh();
+                }
+            }
         }
 
         async function toggleQuietHours() {
@@ -1457,7 +1510,11 @@ if ($gold['success']) {
                 const res = await fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ quiet_hours: { weekday, weekend } })
+                    body: JSON.stringify({ quiet_hours: {
+                        enabled: document.getElementById('quietHoursToggle').checked,
+                        weekday,
+                        weekend
+                    } })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -1471,11 +1528,12 @@ if ($gold['success']) {
             }
         }
 
-        // Init
-        loadSettings();
-        loadWpApiSettings();
-        fetchPrices();
-        startAutoRefresh();
+        // Init — JS-1: รอ loadSettings + loadWpApiSettings เสร็จก่อน start timer
+        (async () => {
+            await Promise.all([loadSettings(), loadWpApiSettings()]);
+            await fetchPrices();
+            startAutoRefresh();
+        })();
     </script>
 </body>
 

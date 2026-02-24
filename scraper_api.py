@@ -45,7 +45,7 @@ def scrape_gold_prices_api() -> dict:
             result["error"] = "GoldTraders API returned empty data"
             return result
 
-        current = api_data[0]
+        current = api_data[-1]
 
         result["gold_bar"] = {
             "buy": current.get("bL_BuyPrice"),
